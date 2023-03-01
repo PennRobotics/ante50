@@ -43,4 +43,4 @@ class Frontend:
 
 if __name__=='__main__':
     g = G()  # TODO-debug
-    frontend = Frontend(Gui.STDIO, g)
+    frontend = Frontend(Gui.CONSOLE, g)
