@@ -3,7 +3,7 @@
 from enum import Enum, auto
 
 class Gui(Enum):
-    STDIO = auto()
+    FILEIO = auto()
     CONSOLE = auto()
     CURSES = auto()
     SDL = auto()
