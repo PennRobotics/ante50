@@ -1,14 +1,14 @@
 # No idea if this will work, but here we go! (TODO)
 
-from enum import Enum
+from enum import Enum, auto
 
 class Gui(Enum):
-    STDIO
-    CONSOLE
-    CURSES
-    SDL
-    TKINTER
-    PYGAME
+    STDIO = auto()
+    CONSOLE = auto()
+    CURSES = auto()
+    SDL = auto()
+    TKINTER = auto()
+    PYGAME = auto()
 
 class G:  # TODO-debug
     def __init__(self):
