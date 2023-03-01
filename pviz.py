@@ -6,6 +6,7 @@ class Gui(Enum):
     STDIO
     CONSOLE
     CURSES
+    SDL
     TKINTER
     PYGAME
 
@@ -26,6 +27,8 @@ class Frontend:
                 print('c')
             case Gui.CURSES:
                 print('n')
+            case Gui.SDL2:
+                print('s')
             case Gui.TKINTER:
                 print('t')
             case Gui.PYGAME:
