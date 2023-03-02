@@ -101,3 +101,4 @@ To run the [pytest](https://github.com/pytest-dev/pytest/) test suite: `pip inst
 
 Coverage can be easily recorded via `pip install coverage`, then `coverage run ante50.py` and eventually `coverage html` or `coverage report`
 
+An example HTML output has been uploaded to this branch. The `DrawFinder` class is not called, so this is highlighted red. A few Hand ranking conditionals were never called, because in 11 iterations, there were no fours of a kind, full houses with two pairs (for selecting the higher of the two), full houses with two triplets (for selecting the higher of the two as the triplet), or any straight flush. Also `Game.remove_player` is never called here, and the only action used by computer players is `Action.CALL`. The `card_name` standalone function is never called, but we know from testing using Pytest that this function provides appropriate output.
