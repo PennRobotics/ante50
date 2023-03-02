@@ -1,0 +1,12 @@
+import signal
+VERSION = '@VERSION@'
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+if __name__ == '__main__':
+    import gi
+
+    from gi.repository import Gio
+
+    from ante50 import main
+    sys.exit(main.main(VERSION))
+
