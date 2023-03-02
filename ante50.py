@@ -1,30 +1,15 @@
 # TODO
 # ====
+# Display table
+# Display players (name and relevant stats)
+# Display cards
+# Display cards as hand
+# Display cards as board
+# Display chips (player stack, bets, pot, side pots) and dealer button
+# Create action buttons
+# Preferences pane (which info to show/hide, color scheme, etc.)
 # Close up existing TODO tags
-# Side pots (and odd chips)
-# Arrays (n=2..10) containing ideal starting hand strength
-# Strategy class
-# - (per round)
-# - (per opponent)
-# - (per situation)
-# - (per current hand)
-# - to start: fold/call/raise percentage with per-round inertia
-# - (integer versions: start with 1)
-# Stats
-# - win/loss hand count
-# - win/loss cash amount
-# - per round: number of folds, calls, raises
-# Player class
-# - avail cash
-# - hand history as stats class
-# - strategy as strategy class
-# Game class
-# - stakes, incl. limit/no-limit/in between
-# - players
-# - handle each round
-# - get input
-# Provide modifiable stats as a JSON (with min version for each stat, for backwards compat)
-# Decision maker (strategy) is imported and called
+# Animation
 
 
 # Imports
