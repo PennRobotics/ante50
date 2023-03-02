@@ -6,6 +6,9 @@ As an example of how GNOME Builder would do this... We need to prepare GTK+ and 
 
 Then, the goal would be to create and run an independent Python script based on the [Python GTK+ 3 Tutorial](https://python-gtk-3-tutorial.readthedocs.io/en/latest/index.html)
 
+(So far, my impression is that meson is not making any installation steps easier for Python sources.)
+
+
 ## Instructions (TODO)
 
 `python3 -m pip install meson`
