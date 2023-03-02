@@ -16,6 +16,8 @@ Install cairo (e.g. libcairo)
 
 `pip install PyGObject`
 
+Install gobject-instrospection (from package manager or source)
+
 `meson setup build`
 
 `cd build`
