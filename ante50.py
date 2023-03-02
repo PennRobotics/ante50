@@ -85,6 +85,7 @@ class Action(IntEnum):
     RAISE = 3
 
 class Position(IntEnum):
+    IGNORE = -1
     EARLY = 1
     MIDDLE = 2
     LATE = 3
@@ -115,16 +116,29 @@ class Stats:
         if v < 1 or v > MAX_VER:
             raise ValueError(f'Invalid version argument provided to Strategy class: {v}')
 
-        hands_won  = [0, 0, 0, 0]
-        hands_lost = [0, 0, 0, 0]
-        chips_won  = [0, 0, 0, 0]
-        chips_lost = [0, 0, 0, 0]
-        num_folds  = [0, 0, 0, 0]
-        num_calls  = [0, 0, 0, 0]
-        num_raises = [0, 0, 0, 0]
+        # Indexes:
+        # 0 = during pre-flop betting
+        # 1 = during flop betting
+        # 2 = during turn betting
+        # 3 = during river betting
+        # 4 = after showdown
+        hands_won  = [0, 0, 0, 0, 0]
+        hands_lost = [0, 0, 0, 0, 0]
+        chips_won  = [0, 0, 0, 0, 0]
+        chips_lost = [0, 0, 0, 0, 0]
+        num_folds  = [0, 0, 0, 0, 0]
+        num_calls  = [0, 0, 0, 0, 0]
+        num_raises = [0, 0, 0, 0, 0]
+        all_in_hands_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+        all_in_chips_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+        hole_str_cnt = Counter()  # TODO: initialize all to zero
         if v == 1:  return
 
         # TODO: future version variables belong here
+        pass
+
+    def calculate_ev(self):
+        # TODO
         pass
 
 
@@ -161,9 +175,10 @@ class Strategy:
         # TODO: future version variables belong here
         pass
 
-    def get_action(self, hole_str):
+    def get_preflop_action(self, hole_str, seat_pos):
         assert isinstance(hole_str, str)
         assert len(hole_str) == 2 or len(hole_str) == 3 and hole_str[2] == 's'
+        # TODO: assert Enum type of seat pos
         if len(hole_str) == 3:
             suited = True
         # TODO: get index of each card, sort uniformly
@@ -474,7 +489,7 @@ class Game:
         absolute_bet_right_now = LIMIT_BET  # TODO-debug
         while True:
             if current_player.npc:
-                action = current_player.strategy.get_action('AKs')  # TODO
+                action = current_player.strategy.get_preflop_action('AKs', Position.IGNORE)  # TODO
                 if action == Action.FOLD:
                     if current_player.current_bet < absolute_bet_right_now:
                         current_player.fold()  # TODO: belongs somewhere else?
