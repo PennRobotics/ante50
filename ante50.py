@@ -161,6 +161,16 @@ class Strategy:
         # TODO: future version variables belong here
         pass
 
+    def get_action(self, hole_str):
+        assert isinstance(hole_str, str)
+        assert len(hole_str) == 2 or len(hole_str) == 3 and hole_str[2] == 's'
+        if len(hole_str) == 3:
+            suited = True
+        # TODO: get index of each card, sort uniformly
+        # TODO: convert index to table index, accounting for suited or not
+
+        return Action.CALL  # TODO
+
 
 class Player:
     name = ''
@@ -426,7 +436,7 @@ class Game:
 
         for player in self.players:
             player.in_hand = True if player.in_game else False
-            player.hole_cards = [ draw_card(npc=npc), draw_card(npc=npc), ]
+            player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
             player.seen_cards = '       ' if not player.in_hand else '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
 
     def show_table_and_get_action(self):
@@ -460,9 +470,11 @@ class Game:
         final_player = self.dealer
         current_player = self.dealer.next
 
+        # TODO: this entire thing needs a revamp. If a betting action occurs, final_player and absolute_bet_right_now needs updating.
+        absolute_bet_right_now = LIMIT_BET  # TODO-debug
         while True:
             if current_player.npc:
-                action = current_player.strategy.get_action()
+                action = current_player.strategy.get_action('AKs')  # TODO
                 if action == Action.FOLD:
                     if current_player.current_bet < absolute_bet_right_now:
                         current_player.fold()  # TODO: belongs somewhere else?
@@ -470,6 +482,7 @@ class Game:
                         check()
                 elif action == Action.CALL:
                     current_player.current_bet = absolute_bet_right_now
+                    current_player.chips -= absolute_bet_right_now  # FIXME
                 elif action == Action.RAISE:
                     if absolute_bet_right_now < betting_cap:
                         current_player.current_bet = LIMIT_BET + absolute_bet_right_now # TODO
