@@ -10,7 +10,7 @@ Then, the goal would be to create and run an independent Python script based on 
 
 `python3 -m pip install meson`
 
-<!-- `python3 -m pip install ninja` -->
+`python3 -m pip install ninja`
 
 `meson setup build`
 
