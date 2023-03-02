@@ -12,6 +12,10 @@ Then, the goal would be to create and run an independent Python script based on 
 
 `python3 -m pip install ninja`
 
+Install cairo (e.g. libcairo)
+
+`pip install PyGObject`
+
 `meson setup build`
 
 `cd build`
