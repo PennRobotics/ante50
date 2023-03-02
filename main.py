@@ -5,19 +5,11 @@ gi.require_version('Gtk', '4.0')
 
 from gi.repository import Gtk, GObject, Gio
 
-class Application(Gtk.Application):
-    def __init__(self):
-        super().__init__(application_id='ante50.app',
-                         flags=Gio.ApplicationFlags.FLAGS_NONE)
+def on_activate(app):
+    win = Gtk.ApplicationWindow(application=app)
+    win.present()
 
-    def do_activate(self):
-        win = self.props.active_window
-        if not win:
-            win = MyWindow('Gtk4 POC', 400, 500, application=self)
-        win.present()
+app = Gtk.Application()
+app.connect('activate', on_activate)
 
-
-def main():
-    ante50_gtk = Application()
-    return ante50_gtk.run(sys.argv)
-
+app.run(None)
