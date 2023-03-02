@@ -41,10 +41,12 @@ CURSOR_UP = '\033[1A' if True else ''
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
 WHEEL = 'A2345'
+
 SUIT_NAME = { 'c': 'club',
               'd': 'diamond',
               'h': 'heart',
               's': 'spade' }
+
 VALUE_NAME = { '2': 'deuce',
                '3': 'trey',
                '4': 'four',
@@ -58,11 +60,13 @@ VALUE_NAME = { '2': 'deuce',
                'Q': 'queen',
                'K': 'king',
                'A': 'ace' }
+
 ROUND_NAME = { 0: 'Pre-flop',
                1: 'Flop',
                2: 'Turn',
                3: 'River',
                4: 'Showdown' }
+
 class HandRank(IntEnum):
     HIGH_CARD = auto()
     PAIR = auto()
@@ -74,6 +78,19 @@ class HandRank(IntEnum):
     QUADS = auto()
     STFU = auto()
     ROYAL = auto()
+
+class Action(IntEnum):
+    FOLD = 1
+    CALL = 2
+    RAISE = 3
+
+class Position(IntEnum):
+    EARLY = 1
+    MIDDLE = 2
+    LATE = 3
+    SB = 4
+    BB = 5
+
 HAND_NAME = {HandRank.HIGH_CARD: '{} high',
              HandRank.PAIR: 'pair of {}s',
              HandRank.TWO_PAIR: '{}s and {}s',
@@ -89,7 +106,6 @@ HAND_NAME = {HandRank.HIGH_CARD: '{} high',
 
 # Globals
 deck = [value + suit for value in VALUES for suit in SUITS]
-precedence = dict([(b,a) for (a,b) in enumerate(deck)])
 known = set()
 unknown = set(deck)
 
@@ -120,6 +136,26 @@ class Strategy:
         self.stddev_perfect_hole_selection = 0.5
         self.stddev_perfect_bet = [0, 0, 0, 0]
         self.position_awareness_frac = 0.8  # 0.0 to 1.0, higher is more aware
+
+        self.strength_table = [
+                #A K Q J T 9 8 7 6 5 4 3 2 (suited)
+                [8,8,7,7,6,4,4,4,4,4,4,4,4], # A
+                [7,8,7,6,5,3,2,2,2,2,2,2,2], # K
+                [6,5,8,6,5,4,2,0,0,0,0,0,0], # Q
+                [5,4,4,8,6,5,3,1,0,0,0,0,0], # J
+                [3,3,3,4,7,5,4,2,0,0,0,0,0], # T
+                [1,1,1,2,2,6,5,4,1,0,0,0,0], # 9
+                [0,0,0,1,1,2,5,4,3,1,0,0,0], # 8
+                [0,0,0,0,0,0,1,4,4,3,1,0,0], # 7
+                [0,0,0,0,0,0,0,1,3,2,2,0,0], # 6
+                [0,0,0,0,0,0,0,0,1,3,3,2,0], # 5
+                [0,0,0,0,0,0,0,0,0,1,2,2,1], # 4
+                [0,0,0,0,0,0,0,0,0,0,0,2,1], # 3
+                [0,0,0,0,0,0,0,0,0,0,0,0,2]] # 2
+                # (off-suit)
+
+        circumstance_and_modification = [('False', 'pass'),]  # TODO
+
         if v == 1:  return
 
         # TODO: future version variables belong here
@@ -150,11 +186,51 @@ class Player:
         pass
 
 
+class OtherHolePredictor:
+    """
+    Figure out all possible combinations of cards from `unknown` and
+    likelihood of calling with each combo. For advanced analysis,
+    consider each board stage and bet. Return a priority queue with
+    a list of likely hole cards and probability of occurrence.
+    """
+    def __init__(self):
+        # TODO
+        pass
+
+
+class DrawFinder:
+    def __init__(self, hole_set, board_set, owner=None):
+        assert isinstance(hole_set, set)
+        assert isinstance(board_set, set)
+        assert len(hole_set) == 2
+        assert len(board_set) < 5
+        self.get_draws(hole_set, board_set)
+
+    def get_draws(self, hole_set, board_set):
+        cards_to_go = 5 - len(board_set)
+        hole0, hole1 = list(hole_set)
+        hole0_v, hole0_s = hole0
+        hole1_v, hole1_s = hole1
+
+        pair = hole0_v == hole1_v
+        suited = hole0_s == hole1_s
+        _dist = abs(VALUES.index(hole0_v) - VALUES.index(hole1_v))
+        connectors = _dist == 1 or _dist == 12
+
+        # Identify range of outcomes including best possible
+        # TODO
+
+        # Get number of draws to each outcome
+        # TODO
+
+
 class Hand:
     def __init__(self, hand_set, owner=None):
         assert isinstance(hand_set, set)
         assert len(hand_set) == 7
+        self.get_value(hand_set, owner=owner)
 
+    def get_value(self, hand_set, owner=None):
         assert owner is None or isinstance(owner, Player)
         self.owner = owner
 
@@ -350,7 +426,7 @@ class Game:
 
         for player in self.players:
             player.in_hand = True if player.in_game else False
-            player.hole_cards = [ draw_card(), draw_card(), ]
+            player.hole_cards = [ draw_card(npc=npc), draw_card(npc=npc), ]
             player.seen_cards = '       ' if not player.in_hand else '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
 
     def show_table_and_get_action(self):
@@ -386,8 +462,18 @@ class Game:
 
         while True:
             if current_player.npc:
-                current_player.current_bet = LIMIT_BET  # TODO
-                current_player.chips -= LIMIT_BET
+                action = current_player.strategy.get_action()
+                if action == Action.FOLD:
+                    if current_player.current_bet < absolute_bet_right_now:
+                        current_player.fold()  # TODO: belongs somewhere else?
+                    else:
+                        check()
+                elif action == Action.CALL:
+                    current_player.current_bet = absolute_bet_right_now
+                elif action == Action.RAISE:
+                    if absolute_bet_right_now < betting_cap:
+                        current_player.current_bet = LIMIT_BET + absolute_bet_right_now # TODO
+                        current_player.chips -= LIMIT_BET  # TODO: this should happen when the bet occurs
             else:
                 print('1 - fold   2 - check/call   3 - bet/raise   q - quit', end='\n\n')
                 #print('1 - fold   2 - check/call   3 - bet/raise   ~ - next hand (debug)', end='\n\n')
@@ -430,7 +516,7 @@ class Game:
         draw_card()  # burn card
         match self.betting_round:
             case 1:
-                min_bet, max_bet = LIMIT_BET, LIMIT_BET
+                min_bet, max_bet = LIMIT_BET, LIMIT_BET  # TODO: implement, also change to bet_amt and cap (for limit)?
                 self.board.append( draw_card() )
                 self.board.append( draw_card() )
                 self.board.append( draw_card() )
@@ -477,11 +563,12 @@ def reshuffle():
     from_deck = iter(deck)
 
 
-def draw_card():
+def draw_card(npc=False):
     global known, unknown
     card = next(from_deck)
-    known |= set(card)
-    unknown -= set(card)
+    if not npc:
+        known |= set(card)
+        unknown -= set(card)
     return card
 
 
