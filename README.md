@@ -27,6 +27,8 @@ For graphical options, I hope to generate vector graphics rather than use the pr
 
 Ideally, game logic would be removed from each function and the functions would be used only to generate example data transfer between the GUI and the rest of the ante50 engine. This branch should _purely_ focus on getting each GUI method perfected and enforcing something like a model-view-controller pattern, where ALL view-related functionality is in its own class, which has no program logic whatsoever.
 
+Currently, <tt>[pviz.py](pviz.py)</tt> has the GUI selection and necessary imports for eventual transfer into <tt>[ante50.py](ante50.py)</tt>.
+
 ## Branches
 
 **main**
