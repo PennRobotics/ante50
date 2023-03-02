@@ -10,6 +10,7 @@ class Gui(Enum):
     SDL = auto()
     TKINTER = auto()
     PYGAME = auto()
+    GTK = auto()  # TODO
 
 class G:  # TODO-debug
     def __init__(self):
