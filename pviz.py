@@ -11,6 +11,7 @@ class Gui(Enum):
     TKINTER = auto()
     PYGAME = auto()
     GTK = auto()  # TODO
+    FLASK = auto()  # TODO
 
 class G:  # TODO-debug
     def __init__(self):
