@@ -18,6 +18,8 @@ Install cairo (e.g. libcairo)
 
 Install gobject-instrospection (from package manager or source)
 
+Install gtk4 development files
+
 `meson setup build`
 
 `cd build`
