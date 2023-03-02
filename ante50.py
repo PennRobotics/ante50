@@ -4,7 +4,7 @@
 # Display players (name and relevant stats)
 # Display cards
 # Display cards as hand
-# Display cards as board
+# Display cards as board and discards
 # Display chips (player stack, bets, pot, side pots) and dealer button
 # Create action buttons
 # Preferences pane (which info to show/hide, color scheme, etc.)
@@ -96,80 +96,6 @@ known = set()
 unknown = set(deck)
 
 
-class Stats:
-    def __init__(self, v=1):
-        if v < 1 or v > MAX_VER:
-            raise ValueError(f'Invalid version argument provided to Strategy class: {v}')
-
-        # Indexes:
-        # 0 = during pre-flop betting
-        # 1 = during flop betting
-        # 2 = during turn betting
-        # 3 = during river betting
-        # 4 = after showdown
-        hands_won  = [0, 0, 0, 0, 0]
-        hands_lost = [0, 0, 0, 0, 0]
-        chips_won  = [0, 0, 0, 0, 0]
-        chips_lost = [0, 0, 0, 0, 0]
-        num_folds  = [0, 0, 0, 0, 0]
-        num_calls  = [0, 0, 0, 0, 0]
-        num_raises = [0, 0, 0, 0, 0]
-        all_in_hands_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-        all_in_chips_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-        hole_str_cnt = Counter()  # TODO: initialize all to zero
-        if v == 1:  return
-
-        # TODO: future version variables belong here
-        pass
-
-    def calculate_ev(self):
-        # TODO
-        pass
-
-
-class Strategy:
-    def __init__(self, v=1):
-        if v < 1 or v > MAX_VER:
-            raise ValueError(f'Invalid version argument provided to Strategy class: {v}')
-
-        self.stddev_perfect_hole_selection = 0.5
-        self.stddev_perfect_bet = [0, 0, 0, 0]
-        self.position_awareness_frac = 0.8  # 0.0 to 1.0, higher is more aware
-
-        self.strength_table = [
-                #A K Q J T 9 8 7 6 5 4 3 2 (suited)
-                [8,8,7,7,6,4,4,4,4,4,4,4,4], # A
-                [7,8,7,6,5,3,2,2,2,2,2,2,2], # K
-                [6,5,8,6,5,4,2,0,0,0,0,0,0], # Q
-                [5,4,4,8,6,5,3,1,0,0,0,0,0], # J
-                [3,3,3,4,7,5,4,2,0,0,0,0,0], # T
-                [1,1,1,2,2,6,5,4,1,0,0,0,0], # 9
-                [0,0,0,1,1,2,5,4,3,1,0,0,0], # 8
-                [0,0,0,0,0,0,1,4,4,3,1,0,0], # 7
-                [0,0,0,0,0,0,0,1,3,2,2,0,0], # 6
-                [0,0,0,0,0,0,0,0,1,3,3,2,0], # 5
-                [0,0,0,0,0,0,0,0,0,1,2,2,1], # 4
-                [0,0,0,0,0,0,0,0,0,0,0,2,1], # 3
-                [0,0,0,0,0,0,0,0,0,0,0,0,2]] # 2
-                # (off-suit)
-
-        circumstance_and_modification = [('False', 'pass'),]  # TODO
-
-        if v == 1:  return
-
-        # TODO: future version variables belong here
-        pass
-
-    def get_preflop_action(self, hole_str, seat_pos):
-        assert isinstance(hole_str, str)
-        assert len(hole_str) == 2 or len(hole_str) == 3 and hole_str[2] == 's'
-        # TODO: assert Enum type of seat pos
-        if len(hole_str) == 3:
-            suited = True
-        # TODO: get index of each card, sort uniformly
-        # TODO: convert index to table index, accounting for suited or not
-
-        return Action.CALL  # TODO
 
 
 class Player:
@@ -188,8 +114,6 @@ class Player:
         self.table_pos = None
         self.current_bet = None
         self.side_pot_idx = None
-        self.stats = Stats(v=v)
-        self.strategy = Strategy(v=v)
         if v == 1: return
 
         # TODO: future version variables belong here
@@ -241,106 +165,16 @@ class Hand:
         self.get_value(hand_set, owner=owner)
 
     def get_value(self, hand_set, owner=None):
-        assert owner is None or isinstance(owner, Player)
-        self.owner = owner
-
-        value_cnt, suit_cnt = map(Counter, zip(*hand_set))
-        assert all([value in VALUES for value in value_cnt])
-        assert all([suit in SUITS for suit in suit_cnt])
-
-        self.hand_set = hand_set
-        self.strength = HandRank.HIGH_CARD
-
-        names = lambda ia: [VALUE_NAME[VALUES[i]] for i in ia]
-
-        # Check for flush
-        common_suit, n_suited = suit_cnt.most_common(1)[0]
-        if n_suited >= 5:
-            self.strength = HandRank.FLUSH
-            self.highest_cards = [VALUE_NAME[VALUES[max([VALUES.index(value) for value, suit in hand_set if suit == common_suit])]]]
-            value, suit = zip(*hand_set)
-            sorted_suit_idxs = sorted([VALUES.index(value) for value, suit in hand_set if suit == common_suit])
-            self.rank = list(reversed(sorted_suit_idxs))[0:5]
-
-        # Check for repeated values (pair, two pair, three of a kind, full house, four of a kind)
-        top_values, top_counts = list(zip(*value_cnt.most_common()))  # Get counts for repeated cards
-        top_card_idxs = [VALUES.index(value) for value in top_values]
-        while True:
-            if top_counts[0] == 4:  # 4-3 or 4-2-1 or 4-1-1-1
-                self.strength = HandRank.QUADS
-                self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:])))[0:1]
-                break
-            if top_counts[0] == 3:
-                if top_counts[1] >= 2:
-                    self.strength = HandRank.HOUSE
-                    if top_counts[1] == 2:
-                        if top_counts[2] == 2:  # 3-2-2
-                            self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:3])))
-                        else:  # 3-2-1-1
-                            self.rank = top_card_idxs
-                    else:  # 3-3-1
-                        self.rank = list(reversed(sorted(top_card_idxs[0:2])))
-                else:  # 3-1-1-1-1
-                    self.strength = max(self.strength, HandRank.TRIPS)
-                    self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:])))[1:4]
-                break
-            if self.strength == HandRank.FLUSH:
-                break
-            if top_counts[0] == 2:
-                if top_counts[1] == 2:
-                    self.strength = HandRank.TWO_PAIR
-                    if top_counts[2] == 2:  # 2-2-2-1
-                        pairs_ranked = list(reversed(sorted(top_card_idxs[0:3])))
-                        self.rank = pairs_ranked[0:2] + list(reversed(sorted(pairs_ranked[2:3] + top_card_idxs[3:4])))[0:1]
-                    else:  # 2-2-1-1-1
-                        self.rank = list(reversed(sorted(top_card_idxs[0:2]))) + list(reversed(sorted(top_card_idxs[2:])))[0:1]
-                else:  # 2-1-1-1-1-1
-                    self.strength = HandRank.PAIR
-                    self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:])))[0:3]
-            break
-
-        # Check for straights and straight flushes
-        if self.strength <= HandRank.FLUSH:
-            baby_straight = len([True for value in list(value_cnt) if value in WHEEL]) == 5
-            value_idxs = sorted([VALUES.index(v) for v in list(value_cnt)])
-            d_value_idxs = ''.join([str(b-a) for (a, b) in pairwise(value_idxs)])  # Conversion to string is slow but easy
-            best_match_idx = d_value_idxs.rfind('1111')
-            if best_match_idx >= 0 or baby_straight:
-                if self.strength < HandRank.FLUSH:
-                    self.strength = HandRank.STRAIGHT
-                    self.rank = [3] if baby_straight and best_match_idx == -1 else [value_idxs[best_match_idx+4]]
-                else:
-                    # Straight and flush in hand, so test if straight flush or simply flush
-                    steel_wheel = len([True for idx in sorted_suit_idxs if VALUES[idx] in WHEEL]) == 5
-                    d_sorted_suit_idxs = ''.join([str(b-a) for (a, b) in pairwise(sorted_suit_idxs)])
-                    best_match_idx = d_sorted_suit_idxs.rfind('1111')
-                    if best_match_idx >= 0 or steel_wheel:
-                        print(sorted_suit_idxs)
-                        self.strength = HandRank.STFU if steel_wheel or sorted_suit_idxs[best_match_idx+4] < 12 else HandRank.ROYAL
-                        self.rank = [3] if steel_wheel and best_match_idx == -1 else [sorted_suit_idxs[best_match_idx+4]]
-
-        # Get high card
-        if self.strength == HandRank.HIGH_CARD:
-            self.rank = list(reversed(sorted(top_card_idxs)))[0:5]
-
-        self.highest_cards = names(self.rank)
+        return None
 
     def __str__(self):
-        return HAND_NAME[self.strength].format(*self.highest_cards).replace('sixs','sixes')
+        return "Placeholder Hand"
 
     def __repr__(self):
         return '<%s object>' % self.__class__.__name__
 
     def compare(self, other):
-        assert isinstance(other, Hand)
-        assert len(self.hand_set | other.hand_set) == 9
-        assert len(self.hand_set & other.hand_set) == 5
-
-        if self.strength != other.strength:
-            return 1 if self.strength > other.strength else -1
-        if self.rank == other.rank:
-            return 0
-        return 1 if self.rank > other.rank else -1
+        return 0
 
     def number_of_outs(self):
         pass
@@ -474,54 +308,17 @@ class Game:
         absolute_bet_right_now = LIMIT_BET  # TODO-debug
         while True:
             if current_player.npc:
-                action = current_player.strategy.get_preflop_action('AKs', Position.IGNORE)  # TODO
-                if action == Action.FOLD:
-                    if current_player.current_bet < absolute_bet_right_now:
-                        current_player.fold()  # TODO: belongs somewhere else?
-                    else:
-                        check()
-                elif action == Action.CALL:
-                    current_player.current_bet = absolute_bet_right_now
-                    current_player.chips -= absolute_bet_right_now  # FIXME
-                elif action == Action.RAISE:
-                    if absolute_bet_right_now < betting_cap:
-                        current_player.current_bet = LIMIT_BET + absolute_bet_right_now # TODO
-                        current_player.chips -= LIMIT_BET  # TODO: this should happen when the bet occurs
+                current_player.check_or_call()  # TODO: implement
             else:
-                print('1 - fold   2 - check/call   3 - bet/raise   q - quit', end='\n\n')
-                #print('1 - fold   2 - check/call   3 - bet/raise   ~ - next hand (debug)', end='\n\n')
-                decision = ''
-                while len(decision) != 1 or decision not in '123q~':
-                    print(CURSOR_UP + ' '*len(decision) + '\r', end='')
-                    decision = input()
-                me = self.players[self.me]
-                match decision:
-                    case '1':
-                        me.in_hand = False
-                        me.seen_cards = '       '
-                        pass
-                    case '2':
-                        me.current_bet = LIMIT_BET  # TODO
-                        me.chips -= LIMIT_BET
-                        pass
-                    case '3':
-                        pass
-                    case 'q':
-                        import sys
-                        sys.exit(0)
-                    ### case '~':
-                    ###     for player in self.players:
-                    ###         player.in_hand = False
-                    ###     self.betting_round = -1  # TODO-hi: fix this, and this is also needed for when everyone folds early
+                final_player = current_player.prev
+                current_player.bet(LIMIT_BET)  # TODO: implement # TODO: set final_player parameter automatically
             if current_player == final_player:
                 break
             current_player = current_player.next
 
-        self.chips_per_pot[-1] += sum([player.current_bet for player in self.players])
+        # TODO: self.chips_per_pot[-1] += sum([player.current_bet for player in self.players])
         for player in self.players:
             player.current_bet = 0
-
-        print(CURSOR_UP * 14)
 
     def advance_round(self):
         num_players = sum([1 if player.in_hand else 0 for player in self.players])
