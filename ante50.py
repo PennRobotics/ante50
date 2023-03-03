@@ -418,7 +418,7 @@ class Game:
             player.in_hand = True if player.in_game else False
             player.current_bet = 0 if player.in_hand else None
             player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
-            player.seen_cards = '       ' if not player.in_hand else '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+            player.seen_cards = '       ' if not player.in_hand else ('|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|')
 
         self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
         self.round_not_finished = True
@@ -520,7 +520,7 @@ class Game:
                 self.board.append( draw_card() )
             case 4:
                 for player in self.players:
-                    player.seen_cards = '       ' if not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+                    player.seen_cards = ' fold  ' if not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
 
     def decide_winner(self):
         # TODO: for each player in the outermost pot, test against neighbor until only players with "0" compare remain.
