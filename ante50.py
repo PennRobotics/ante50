@@ -319,6 +319,8 @@ class Game:
         assert isinstance(n, int)
         assert n > 1 and n <= 10
         self.betting_round = -1
+        self.bet_amt = 0
+        self.bet_cap = 0
         self.round_not_finished = None
         self.num_hands = 0
         self.active_players = n
@@ -412,6 +414,7 @@ class Game:
             player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
             player.seen_cards = '       ' if not player.in_hand else '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
 
+        self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
         self.round_not_finished = True
 
     def advance_button(self):
@@ -436,39 +439,41 @@ class Game:
         print('         ' + '   '.join([player.seen_cards for player in self.players]) )
         print()
 
-    def execute(self, player, action):
-        assert isinstance(player, Player)
+    def execute(self, action):
         assert isinstance(action, Action)
 
         decision = Action.UNDECIDED
         match action:
             case Action.CHECK_OR_FOLD:
-                decision = Action.CHECK if self.current_bet == player.current_bet else Action.FOLD
+                decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.FOLD
             case Action.CHECK_OR_CALL:
-                decision = Action.CHECK if self.current_bet == player.current_bet else Action.CALL
+                decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.CALL
             case Action.RAISE_OR_CALL:
-                decision = Action.CALL if self.current_bet == self.max_bet else Action.RAISE
+                decision = Action.CALL if self.active_bet == self.max_bet else Action.RAISE
             case _:
                 raise ValueError(f'"action" argument provided to execute() ({action.name}) is disallowed')
 
+        print(action.name)  # TODO-debug
         match decision:
             case Action.FOLD:
-                pass
+                raise RuntimeError('TODO')
             case Action.CHECK:
-                pass
+                raise RuntimeError('TODO')
             case Action.CALL:
-                pass
+                raise RuntimeError('TODO')
             case Action.RAISE:
-                pass
+                raise RuntimeError('TODO')
             case _:
                 print('testme')  # TODO-debug
                 raise ValueError(f'"decision" value assigned by execute() ({action.name}) is disallowed')
                         ### me.current_bet = LIMIT_BET  # TODO
                         ### me.chips -= LIMIT_BET
 
-        if player == self.last_player_to_decide:
-            # TODO: declare round "over"
-            pass
+        if self.acting_player == self.last_player_to_decide:
+            self.round_not_finished = False
+
+        self.acting_player = self.acting_player.next
+
 
 
     def get_action(self):
@@ -479,34 +484,14 @@ class Game:
         self.acting_player = self.dealer.next if self.betting_round > 0 else (self.dealer.next.next.next if self.active_players > 2 else self.dealer)
         self.last_player_to_decide = self.acting_player.prev
 
-        ### # TODO: this entire thing needs a revamp. If a betting action occurs, final_player and absolute_bet_right_now needs updating.
-        ### absolute_bet_right_now = LIMIT_BET  # TODO-debug
-        ### while self.round_not_finished:
-        ###     if current_player.npc:
-        ###         action = Action.CHECK_OR_CALL
-        ###     else:
-        ###         hole_str = current_player.hole_str()
-        ###         action = preflop_strat.get_preflop_action(hole_str)
-        ###         self.execute(action)
-        ###         if action == Action.FOLD:
-        ###             if current_player.current_bet < absolute_bet_right_now:
-        ###                 current_player.fold()  # TODO: belongs somewhere else?
-        ###             else:
-        ###                 check()
-        ###         elif action == Action.CALL:
-        ###             current_player.current_bet = absolute_bet_right_now
-        ###             current_player.chips -= absolute_bet_right_now  # FIXME
-        ###         elif action == Action.RAISE:
-        ###             if absolute_bet_right_now < betting_cap:
-        ###                 current_player.current_bet = LIMIT_BET + absolute_bet_right_now # TODO
-        ###                 current_player.chips -= LIMIT_BET  # TODO: this should happen when the bet occurs
-        ###     if current_player == final_player:
-        ###         break
-        ###     current_player = current_player.next
-
-        ### self.chips_per_pot[-1] += sum([player.current_bet for player in self.players])
-        ### for player in self.players:
-        ###     player.current_bet = 0
+        # TODO: fix betting, chip values
+        while self.round_not_finished:
+            if self.acting_player.npc:
+                action = Action.CHECK_OR_CALL
+            else:
+                hole_str = self.acting_player.hole_str()
+                action = preflop_strat.get_preflop_action(hole_str)
+            self.execute(action)
 
     def advance_round(self):
         # TODO: active_players ... num_players = sum([1 if player.in_hand else 0 for player in self.players])
@@ -514,15 +499,15 @@ class Game:
         draw_card()  # burn card
         match self.betting_round:
             case 1:
-                min_bet, max_bet = LIMIT_BET, LIMIT_BET  # TODO: implement, also change to bet_amt and cap (for limit)?
+                self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
                 self.board.append( draw_card() )
                 self.board.append( draw_card() )
                 self.board.append( draw_card() )
             case 2:
-                min_bet, max_bet = 2 * LIMIT_BET, 2 * LIMIT_BET
+                self.bet_amt, self.bet_cap = 2 * LIMIT_BET, 8 * LIMIT_BET
                 self.board.append( draw_card() )
             case 3:
-                min_bet, max_bet = 2 * LIMIT_BET, 2 * LIMIT_BET
+                self.bet_amt, self.bet_cap = 2 * LIMIT_BET, 8 * LIMIT_BET
                 self.board.append( draw_card() )
             case 4:
                 for player in self.players:
