@@ -481,11 +481,9 @@ class Game:
 
         self.acting_player = self.acting_player.next
 
-
-
     def get_action(self):
         assert self.betting_round < 4
-        assert self.last_player_to_decide == None
+        assert self.last_player_to_decide == None  # TODO: failing somehow
         assert self.acting_player == None
 
         self.acting_player = self.dealer.next if self.betting_round > 0 else (self.dealer.next.next.next if self.active_players > 2 else self.dealer)
