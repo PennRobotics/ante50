@@ -223,9 +223,6 @@ class Hand:
     def __init__(self, hand_set, owner=None):
         assert isinstance(hand_set, set)
         assert len(hand_set) == 7
-        self.get_value(hand_set, owner=owner)
-
-    def get_value(self, hand_set, owner=None):
         assert owner is None or isinstance(owner, Player)
         self.owner = owner
 
@@ -260,14 +257,16 @@ class Hand:
                     self.strength = HandRank.HOUSE
                     if top_counts[1] == 2:
                         if top_counts[2] == 2:  # 3-2-2
-                            self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:3], reverse=True))
+                            self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:3], reverse=True))[0:1]
                         else:  # 3-2-1-1
-                            self.rank = top_card_idxs
+                            self.rank = top_card_idxs[0:2]
                     else:  # 3-3-1
-                        self.rank = list(sorted(top_card_idxs[0:2], reverse=True))
+                        self.rank = list(sorted(top_card_idxs[0:2], reverse=True))[0:2]
                 else:  # 3-1-1-1-1
+                    if self.strength == HandRank.FLUSH:
+                        break
                     self.strength = max(self.strength, HandRank.TRIPS)
-                    self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:], reverse=True))[1:4]
+                    self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:], reverse=True))[0:2]
                 break
             if self.strength == HandRank.FLUSH:
                 break
@@ -309,6 +308,30 @@ class Hand:
 
         self.highest_cards = names(self.rank)
 
+        match self.strength:
+            case HandRank.HIGH_CARD:
+                assert len(self.rank) == 5
+            case HandRank.PAIR:
+                assert len(self.rank) == 4
+            case HandRank.TWO_PAIR:
+                assert len(self.rank) == 3
+            case HandRank.TRIPS:
+                assert len(self.rank) == 3
+            case HandRank.STRAIGHT:
+                assert len(self.rank) == 1
+            case HandRank.FLUSH:
+                assert len(self.rank) == 5
+            case HandRank.HOUSE:
+                assert len(self.rank) == 2
+            case HandRank.QUADS:
+                assert len(self.rank) == 2
+            case HandRank.STFU:
+                assert len(self.rank) == 1
+            case HandRank.ROYAL:
+                assert len(self.rank) == 1
+            case _:
+                assert False
+
     def __str__(self):
         return HAND_NAME[self.strength].format(*self.highest_cards).replace('sixs','sixes')
 
@@ -320,22 +343,18 @@ class Hand:
         assert len(self.hand_set | other.hand_set) == 9
         assert len(self.hand_set & other.hand_set) == 5
 
+        print(self.hand_set, self.strength.name, self.rank)
+        print(other.hand_set, other.strength.name, other.rank)
+
         if self.strength != other.strength:
             return 1 if self.strength > other.strength else -1
-        # TODO: rank assignment shall only be _5_ cards (in HandRank.get_value)
-        # for s, o in zip(self.rank, other.rank): (or something like this)
-        #     if s > o:
-        #         return 1
-        #     if s < o:
-        #         return -1
-        # return 0
 
-        if self.rank == other.rank:
-            return 0
-        return 1 if self.rank > other.rank else -1
-
-    def number_of_outs(self):
-        pass
+        for s, o in zip(self.rank, other.rank):
+            if s > o:
+                return 1
+            if s < o:
+                return -1
+        return 0
 
 
 class Game:
@@ -533,6 +552,8 @@ class Game:
         print('         ' + '   '.join([player.seen_cards for player in self.players]) )
         print()
 
+        assert len(winner_str) < 50
+
     def execute(self, action):
         assert isinstance(action, Action)
 
@@ -625,8 +646,10 @@ class Game:
             elif outcome < 0:
                 for _ in range(i+1):
                     showdown_pool.pop(0)
+                i = 0
             else:
                 i += 1
+            print(len(showdown_pool))
 
         self.winners = [[hand.owner.name for hand in showdown_pool], [str(hand) for hand in showdown_pool],]
 
@@ -664,6 +687,6 @@ def card_name(card):
 
 if __name__ == '__main__':
     preflop_strat = Strategy()
-    game = Game(players=10, hands=2)
+    game = Game(players=10, hands=-1)
     game.play()
 
