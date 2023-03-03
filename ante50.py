@@ -466,16 +466,15 @@ class Game:
             case Action.CHECK:
                 pass
             case Action.CALL:
+                # TODO: check that player has enough chips
                 self.acting_player.current_bet = self.active_bet
             case Action.RAISE:
+                # TODO: check that player has enough chips
                 if not self.active_bet:  # Bet
                     self.active_bet = self.bet_amt
                 else:  # Raise
                     self.active_bet = min(self.active_bet + self.bet_amt, self.bet_cap)
                 self.last_player_to_decide = self.acting_player.prev
-            case _:
-                print('testme')  # TODO-debug
-                raise ValueError(f'"decision" value assigned by execute() ({action.name}) is disallowed')
                         ### me.current_bet = LIMIT_BET  # TODO
                         ### me.chips -= LIMIT_BET
 
