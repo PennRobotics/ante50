@@ -4,6 +4,7 @@
 # Side pots (and odd chips) correctly distributed
 # Provide modifiable stats as a JSON
 # Decision maker (strategy) is imported and called
+# Function to sort by card value (instead of calling VALUES[sorted(VALUES.index(v))])
 
 # TODO: put docstrings for each major code block:
 # Strategy class
@@ -215,7 +216,7 @@ class Hand:
             self.strength = HandRank.FLUSH
             self.highest_cards = [VALUE_NAME[VALUES[max([VALUES.index(value) for value, suit in hand_set if suit == common_suit])]]]
             value, suit = zip(*hand_set)
-            sorted_suit_idxs = sorted([VALUES.index(value) for value, suit in hand_set if suit == common_suit])
+            sorted_suit_idxs = sorted([VALUES.index(value) for value, suit in hand_set if suit == common_suit])  # TODO: probably use reverse=True
             self.rank = list(reversed(sorted_suit_idxs))[0:5]
 
         # Check for repeated values (pair, two pair, three of a kind, full house, four of a kind)
@@ -224,21 +225,21 @@ class Hand:
         while True:
             if top_counts[0] == 4:  # 4-3 or 4-2-1 or 4-1-1-1
                 self.strength = HandRank.QUADS
-                self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:])))[0:1]
+                self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:], reverse=True))[0:1]
                 break
             if top_counts[0] == 3:
                 if top_counts[1] >= 2:
                     self.strength = HandRank.HOUSE
                     if top_counts[1] == 2:
                         if top_counts[2] == 2:  # 3-2-2
-                            self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:3])))
+                            self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:3], reverse=True))
                         else:  # 3-2-1-1
                             self.rank = top_card_idxs
                     else:  # 3-3-1
-                        self.rank = list(reversed(sorted(top_card_idxs[0:2])))
+                        self.rank = list(sorted(top_card_idxs[0:2], reverse=True))
                 else:  # 3-1-1-1-1
                     self.strength = max(self.strength, HandRank.TRIPS)
-                    self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:])))[1:4]
+                    self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:], reverse=True))[1:4]
                 break
             if self.strength == HandRank.FLUSH:
                 break
@@ -246,13 +247,13 @@ class Hand:
                 if top_counts[1] == 2:
                     self.strength = HandRank.TWO_PAIR
                     if top_counts[2] == 2:  # 2-2-2-1
-                        pairs_ranked = list(reversed(sorted(top_card_idxs[0:3])))
-                        self.rank = pairs_ranked[0:2] + list(reversed(sorted(pairs_ranked[2:3] + top_card_idxs[3:4])))[0:1]
+                        pairs_ranked = list(sorted(top_card_idxs[0:3], reverse=True))
+                        self.rank = pairs_ranked[0:2] + list(sorted(pairs_ranked[2:3] + top_card_idxs[3:4], reverse=True))[0:1]
                     else:  # 2-2-1-1-1
-                        self.rank = list(reversed(sorted(top_card_idxs[0:2]))) + list(reversed(sorted(top_card_idxs[2:])))[0:1]
+                        self.rank = list(sorted(top_card_idxs[0:2], reverse=True)) + list(sorted(top_card_idxs[2:], reverse=True))[0:1]
                 else:  # 2-1-1-1-1-1
                     self.strength = HandRank.PAIR
-                    self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:])))[0:3]
+                    self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:], reverse=True))[0:3]
             break
 
         # Check for straights and straight flushes
@@ -277,7 +278,7 @@ class Hand:
 
         # Get high card
         if self.strength == HandRank.HIGH_CARD:
-            self.rank = list(reversed(sorted(top_card_idxs)))[0:5]
+            self.rank = list(sorted(top_card_idxs, reverse=True))[0:5]
 
         self.highest_cards = names(self.rank)
 
