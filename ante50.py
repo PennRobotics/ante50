@@ -322,6 +322,14 @@ class Hand:
 
         if self.strength != other.strength:
             return 1 if self.strength > other.strength else -1
+        # TODO: rank assignment shall only be _5_ cards (in HandRank.get_value)
+        # for s, o in zip(self.rank, other.rank): (or something like this)
+        #     if s > o:
+        #         return 1
+        #     if s < o:
+        #         return -1
+        # return 0
+
         if self.rank == other.rank:
             return 0
         return 1 if self.rank > other.rank else -1
