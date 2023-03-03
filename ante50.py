@@ -187,7 +187,7 @@ class Player:
         print(values)
         print(suits)
 
-        out_str = ''  # TODO-debug
+        out_str = ''.join([VALUES[i] for i in sorted([VALUES.index(v) for v in values], reverse=True)])
         out_str += 's' if suits[0] == suits[1] else ''
 
 
