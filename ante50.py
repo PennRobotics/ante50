@@ -519,6 +519,8 @@ class Game:
         player.in_hand = False
 
     def begin_round(self):
+        print([p.chips for p in self.players])  # TODO-debug
+        assert sum([p.chips for p in self.players]) == 2000
         self.round_not_finished = True
         self.num_hands += 1
         self.chips_per_pot = [0]
@@ -550,8 +552,12 @@ class Game:
             player.in_hand = True if player.in_game else False
             player.cum_bet = 0 if player.in_hand else None
             player.current_bet = 0
-            player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
-            player.seen_cards = '       ' if not player.in_hand else ('|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|')
+            if player.in_hand:
+                player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
+                player.seen_cards = '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+            else:
+                player.hole_cards = None
+                player.seen_cards = '       '
 
     def advance_button(self):
         self.dealer.button = False
@@ -663,7 +669,8 @@ class Game:
                 self.board.append( draw_card() )
             case 4:
                 for player in self.players:
-                    player.seen_cards = ' fold  ' if player.in_game and not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+                    if player.in_game:
+                        player.seen_cards = ' fold  ' if not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
 
     def decide_winner(self):
         # TODO: for each player in the outermost pot, test against neighbor until only players with "0" compare remain.
@@ -746,7 +753,7 @@ def card_name(card):
 if __name__ == '__main__':
     preflop_strat = Strategy()
     bob_stats = Stats()
-    game = Game(players=10, hands=1000)
+    game = Game(players=10, hands=10000)
     game.play()
     bob_stats.print_stats()
 
