@@ -450,6 +450,8 @@ class Game:
             case _:
                 print('testme')  # TODO-debug
                 raise ValueError(f'"decision" value assigned by execute() ({action.name}) is disallowed')
+                        ### me.current_bet = LIMIT_BET  # TODO
+                        ### me.chips -= LIMIT_BET
 
         if player == self.last_player_to_decide:
             # TODO: declare round "over"
@@ -467,62 +469,34 @@ class Game:
         # TODO-debug: test that execute() fails with invalid arg
         self.execute(self.dealer, Action.FOLD)
 
-        # TODO: this entire thing needs a revamp. If a betting action occurs, final_player and absolute_bet_right_now needs updating.
-        absolute_bet_right_now = LIMIT_BET  # TODO-debug
-        while self.round_not_finished:
-            if current_player.npc:
-                action = Action.CHECK_OR_CALL
-            else:
-                hole_str = current_player.hole_str()
-                action = preflop_strat.get_preflop_action(hole_str)
-                self.execute(action)
-                if action == Action.FOLD:
-                    if current_player.current_bet < absolute_bet_right_now:
-                        current_player.fold()  # TODO: belongs somewhere else?
-                    else:
-                        check()
-                elif action == Action.CALL:
-                    current_player.current_bet = absolute_bet_right_now
-                    current_player.chips -= absolute_bet_right_now  # FIXME
-                elif action == Action.RAISE:
-                    if absolute_bet_right_now < betting_cap:
-                        current_player.current_bet = LIMIT_BET + absolute_bet_right_now # TODO
-                        current_player.chips -= LIMIT_BET  # TODO: this should happen when the bet occurs
-            else:
-                print('1 - fold   2 - check/call   3 - bet/raise   q - quit', end='\n\n')
-                #print('1 - fold   2 - check/call   3 - bet/raise   ~ - next hand (debug)', end='\n\n')
-                decision = ''
-                while len(decision) != 1 or decision not in '123q~':
-                    print(CURSOR_UP + ' '*len(decision) + '\r', end='')
-                    decision = input()
-                me = self.players[self.me]
-                match decision:
-                    case '1':
-                        me.in_hand = False
-                        me.seen_cards = '       '
-                        pass
-                    case '2':
-                        me.current_bet = LIMIT_BET  # TODO
-                        me.chips -= LIMIT_BET
-                        pass
-                    case '3':
-                        pass
-                    case 'q':
-                        import sys
-                        sys.exit(0)
-                    ### case '~':
-                    ###     for player in self.players:
-                    ###         player.in_hand = False
-                    ###     self.betting_round = -1  # TODO-hi: fix this, and this is also needed for when everyone folds early
-            if current_player == final_player:
-                break
-            current_player = current_player.next
+        ### # TODO: this entire thing needs a revamp. If a betting action occurs, final_player and absolute_bet_right_now needs updating.
+        ### absolute_bet_right_now = LIMIT_BET  # TODO-debug
+        ### while self.round_not_finished:
+        ###     if current_player.npc:
+        ###         action = Action.CHECK_OR_CALL
+        ###     else:
+        ###         hole_str = current_player.hole_str()
+        ###         action = preflop_strat.get_preflop_action(hole_str)
+        ###         self.execute(action)
+        ###         if action == Action.FOLD:
+        ###             if current_player.current_bet < absolute_bet_right_now:
+        ###                 current_player.fold()  # TODO: belongs somewhere else?
+        ###             else:
+        ###                 check()
+        ###         elif action == Action.CALL:
+        ###             current_player.current_bet = absolute_bet_right_now
+        ###             current_player.chips -= absolute_bet_right_now  # FIXME
+        ###         elif action == Action.RAISE:
+        ###             if absolute_bet_right_now < betting_cap:
+        ###                 current_player.current_bet = LIMIT_BET + absolute_bet_right_now # TODO
+        ###                 current_player.chips -= LIMIT_BET  # TODO: this should happen when the bet occurs
+        ###     if current_player == final_player:
+        ###         break
+        ###     current_player = current_player.next
 
-        self.chips_per_pot[-1] += sum([player.current_bet for player in self.players])
-        for player in self.players:
-            player.current_bet = 0
-
-        print(CURSOR_UP * 14)
+        ### self.chips_per_pot[-1] += sum([player.current_bet for player in self.players])
+        ### for player in self.players:
+        ###     player.current_bet = 0
 
     def advance_round(self):
         # TODO: active_players ... num_players = sum([1 if player.in_hand else 0 for player in self.players])
