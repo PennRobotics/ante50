@@ -186,7 +186,8 @@ class Player:
         print(values)
         print(suits)
 
-        out_str.append('' if hole_cards[0][1] != hole_cards[1][1] else 's')
+        out_str = ''  # TODO-debug
+        out_str += 's' if suits[0] == suits[1] else ''
 
 
 class Hand:
