@@ -150,12 +150,19 @@ class Strategy:
     def get_preflop_action(self, hole_str):
         assert isinstance(hole_str, str)
         assert len(hole_str) == 2 or len(hole_str) == 3 and hole_str[2] == 's'
+        assert all([v in VALUES for v in hole_str[0:2]])
+
         if len(hole_str) == 3:
             suited = True
-        # TODO: get index of each card, sort uniformly
-        # TODO: convert index to table index, accounting for suited or not
 
-        return Action.CALL  # TODO
+        i = VALUES.index(hole_str[0])
+        j = VALUES.index(hole_str[1])
+        print('ST')
+        print(self.strength_table)
+        print('idx')
+        print(i, j)
+
+        return "todo"
 
 
 class Player:
