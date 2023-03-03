@@ -456,9 +456,6 @@ class Game:
             case _:
                 raise ValueError(f'"action" argument provided to execute() ({action.name}) is disallowed')
 
-        print(action.name)  # TODO-debug
-        print(decision.name)  # TODO-debug
-
         match decision:
             case Action.FOLD:
                 self.acting_player.in_hand = False
