@@ -582,16 +582,6 @@ def card_name(card):
     return f'{VALUE_NAME[value]} of {SUIT_NAME[suit]}s'
 
 
-# TODO-debug
-pfs = Strategy()
-plyr = Player(npc=False)
-reshuffle()
-plyr.hole_cards = [ draw_card(), draw_card(), ]
-hole_str = plyr.hole_str()
-print(hole_str)
-print(pfs.get_preflop_action(hole_str).name)
-
-
 ### if __name__ == '__main__':
 ###     preflop_strat = Strategy()
 ###     game = Game(n=10)

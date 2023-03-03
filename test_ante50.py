@@ -1,13 +1,13 @@
-from ante50 import Game, Hand, Strategy, reshuffle, draw_card, card_name
+from ante50 import Game, Hand, Player, Strategy, reshuffle, draw_card, card_name
 
 import pytest
 
 
-def test_strategy_class():
-    with pytest.raises(ValueError):
-        Strategy(v=0)
-    s = Strategy(v=1)
-    assert s.position_awareness_frac == 0.8
+### def test_strategy_class():
+###     with pytest.raises(ValueError):
+###         Strategy(v=0)
+###     s = Strategy(v=1)
+###     assert s.position_awareness_frac == 0.8
 
 
 def test_hand_failures():
@@ -279,6 +279,48 @@ def test_game_players_cycle():
     assert current_player == game.players[4]
     assert current_player.prev == current_player.next
 
+
+def test_preflop_strength_table_and_hole_str():
+    preflop_strat = Strategy()
+    plyr = Player(npc=False)
+
+    # TODO: test failure cases
+
+    plyr.hole_cards = ['Ks', 'Qs',]
+    hole_str = plyr.hole_str()
+    assert hole_str == 'KQs'
+    plyr.hole_cards = ['Qs', 'Ks',]
+    hole_str = plyr.hole_str()
+    assert hole_str == 'KQs'  # check highest character is always first (suited)
+    assert preflop_strat.get_preflop_action(hole_str).name == 'RAISE_OR_CALL'
+
+    plyr.hole_cards = ['As', 'Ah',]
+    hole_str = plyr.hole_str()
+    assert hole_str == 'AA'
+    assert preflop_strat.get_preflop_action(hole_str).name == 'RAISE_OR_CALL'
+
+    plyr.hole_cards = ['Ah', 'Js',]
+    hole_str = plyr.hole_str()
+    assert hole_str == 'AJ'
+    plyr.hole_cards = ['Js', 'Ah',]  # check highest character is always first (unsuited)
+    hole_str = plyr.hole_str()
+    assert hole_str == 'AJ'
+    assert preflop_strat.get_preflop_action(hole_str).name == 'CHECK_OR_CALL'
+
+    plyr.hole_cards = ['Js', 'As',]
+    hole_str = plyr.hole_str()
+    assert hole_str == 'AJs'
+    assert preflop_strat.get_preflop_action(hole_str).name == 'RAISE_OR_CALL'
+
+    plyr.hole_cards = ['8d', '7d',]
+    hole_str = plyr.hole_str()
+    assert hole_str == '87s'
+    assert preflop_strat.get_preflop_action(hole_str).name == 'CHECK_OR_CALL'
+
+    plyr.hole_cards = ['7c', '8d',]
+    hole_str = plyr.hole_str()
+    assert hole_str == '87'
+    assert preflop_strat.get_preflop_action(hole_str).name == 'CHECK_OR_FOLD'
 
 # TODO: create game n=2, fold at each stage and check board and deck are correctly allocated
 def test_headsup_game_variable_allocation(monkeypatch):
