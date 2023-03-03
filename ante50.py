@@ -183,7 +183,7 @@ class Player:
         assert all([len(e) == 2 for e in self.hole_cards])
 
         values, suits = zip(*self.hole_cards)
-        print(hole_cards)  # TODO-debug
+        print(self.hole_cards)  # TODO-debug
 
         out_str = ''.join([VALUES[i] for i in sorted([VALUES.index(v) for v in values], reverse=True)])
         out_str += 's' if suits[0] == suits[1] else ''
