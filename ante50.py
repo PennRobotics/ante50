@@ -479,9 +479,6 @@ class Game:
         self.acting_player = self.dealer.next if self.betting_round > 0 else (self.dealer.next.next.next if self.active_players > 2 else self.dealer)
         self.last_player_to_decide = self.acting_player.prev
 
-        # TODO-debug: test that execute() fails with invalid arg
-        self.execute(self.dealer, Action.FOLD)
-
         ### # TODO: this entire thing needs a revamp. If a betting action occurs, final_player and absolute_bet_right_now needs updating.
         ### absolute_bet_right_now = LIMIT_BET  # TODO-debug
         ### while self.round_not_finished:
