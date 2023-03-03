@@ -461,7 +461,8 @@ class Game:
 
         match decision:
             case Action.FOLD:
-                raise RuntimeError('TODO')
+                self.acting_player.in_hand = False
+                # TODO: transfer_current_bet_chips_into_appropriate_pot
             case Action.CHECK:
                 pass
             case Action.CALL:
