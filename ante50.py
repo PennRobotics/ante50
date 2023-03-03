@@ -154,21 +154,19 @@ class Strategy:
 
         suited = True if len(hole_str) == 3 else False
 
-        print(hole_str)  # TODO-debug
-
         i = 12 - VALUES.index(hole_str[0])
         j = 12 - VALUES.index(hole_str[1])
-        print('ST')
-        print('\n'.join([''.join(str(n)) for n in self.strength_table]))
-        print('idx')
-        if suited:
-            print(i, j)
-            print(self.strength_table[i][j])
-        else:
-            print(j, i)
-            print(self.strength_table[j][i])
+        i, j = (i, j) if suited else (j, i)
 
-        return "todo"
+        match self.strength_table[i][j]:
+            case 8 | 7 | 6 | 5:
+                return Action.RAISE_OR_CALL
+            case 4 | 3:
+                return Action.CHECK_OR_CALL
+            case 2 | 1 | 0:
+                return Action.CHECK_OR_FOLD
+            case _:
+                raise RuntimeError('strength_table has an unexpected value')  # TODO: make this error better
 
 
 class Player:
