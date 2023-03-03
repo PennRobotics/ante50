@@ -112,10 +112,7 @@ unknown = set(deck)
 
 
 class Stats:
-    def __init__(self, v=1):
-        if v < 1 or v > MAX_VER:
-            raise ValueError(f'Invalid version argument provided to Strategy class: {v}')
-
+    def __init__(self):
         # Indexes:
         # 0 = during pre-flop betting
         # 1 = during flop betting
@@ -132,10 +129,6 @@ class Stats:
         all_in_hands_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
         all_in_chips_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
         hole_str_cnt = Counter()  # TODO: initialize all to zero
-        if v == 1:  return
-
-        # TODO: future version variables belong here
-        pass
 
     def calculate_ev(self):
         # TODO
@@ -143,14 +136,7 @@ class Stats:
 
 
 class Strategy:
-    def __init__(self, v=1):
-        if v < 1 or v > MAX_VER:
-            raise ValueError(f'Invalid version argument provided to Strategy class: {v}')
-
-        self.stddev_perfect_hole_selection = 0.5
-        self.stddev_perfect_bet = [0, 0, 0, 0]
-        self.position_awareness_frac = 0.8  # 0.0 to 1.0, higher is more aware
-
+    def __init__(self):
         self.strength_table = [
                 #A K Q J T 9 8 7 6 5 4 3 2 (suited)
                 [8,8,7,7,6,4,4,4,4,4,4,4,4], # A
@@ -168,13 +154,6 @@ class Strategy:
                 [0,0,0,0,0,0,0,0,0,0,0,0,2]] # 2
                 # (off-suit)
 
-        circumstance_and_modification = [('False', 'pass'),]  # TODO
-
-        if v == 1:  return
-
-        # TODO: future version variables belong here
-        pass
-
     def get_preflop_action(self, hole_str, seat_pos):
         assert isinstance(hole_str, str)
         assert len(hole_str) == 2 or len(hole_str) == 3 and hole_str[2] == 's'
@@ -189,7 +168,7 @@ class Strategy:
 
 class Player:
     name = ''
-    def __init__(self, v=1, npc=True):
+    def __init__(self, npc=True):
         assert isinstance(npc, bool)
         self.npc = npc
         if not npc:  return
@@ -203,50 +182,6 @@ class Player:
         self.table_pos = None
         self.current_bet = None
         self.side_pot_idx = None
-        self.stats = Stats(v=v)
-        self.strategy = Strategy(v=v)
-        if v == 1: return
-
-        # TODO: future version variables belong here
-        pass
-
-
-class OtherHolePredictor:
-    """
-    Figure out all possible combinations of cards from `unknown` and
-    likelihood of calling with each combo. For advanced analysis,
-    consider each board stage and bet. Return a priority queue with
-    a list of likely hole cards and probability of occurrence.
-    """
-    def __init__(self):
-        # TODO
-        pass
-
-
-class DrawFinder:
-    def __init__(self, hole_set, board_set, owner=None):
-        assert isinstance(hole_set, set)
-        assert isinstance(board_set, set)
-        assert len(hole_set) == 2
-        assert len(board_set) < 5
-        self.get_draws(hole_set, board_set)
-
-    def get_draws(self, hole_set, board_set):
-        cards_to_go = 5 - len(board_set)
-        hole0, hole1 = list(hole_set)
-        hole0_v, hole0_s = hole0
-        hole1_v, hole1_s = hole1
-
-        pair = hole0_v == hole1_v
-        suited = hole0_s == hole1_s
-        _dist = abs(VALUES.index(hole0_v) - VALUES.index(hole1_v))
-        connectors = _dist == 1 or _dist == 12
-
-        # Identify range of outcomes including best possible
-        # TODO
-
-        # Get number of draws to each outcome
-        # TODO
 
 
 class Hand:
@@ -362,9 +297,8 @@ class Hand:
 
 
 class Game:
-    def __init__(self, n=5, v=1):
+    def __init__(self, n=5):
         assert isinstance(n, int)
-        assert isinstance(v, int)
         assert n > 1 and n <= 10
         self.betting_round = -1
         self.active_players = n
@@ -383,7 +317,7 @@ class Game:
         # Give players names, chips, and a dealer button
         for i, player in enumerate(self.players, 1):
             player.in_game = True
-            player.button = True if i == 1 else False  # TODO: properly randomize
+            player.button = True if i == 1 else False
             player.name = f'Plyr {i:<2}' if player.npc else '  Bob  '
             player.chips = 5000
             player.table_pos = i
@@ -421,22 +355,25 @@ class Game:
     def play(self):
         while self.active_players > 1:
             self.begin_round()
-            self.show_table_and_get_action()  # Pre-flop
+            self.show_round()  # Pre-flop
+            self.get_action()
 
-            if self.advance_round():  continue
-            self.show_table_and_get_action()  # Flop
+            self.advance_round()
+            self.show_round()  # Flop
+            self.get_action()
 
-            if self.advance_round():  continue
-            self.show_table_and_get_action()  # Turn
+            self.advance_round()
+            self.show_round()  # Turn
+            self.get_action()
 
-            if self.advance_round():  continue
-            self.show_table_and_get_action()  # River
+            self.advance_round()
+            self.show_round()  # River
+            self.get_action()
 
-            if self.advance_round(): continue
-            self.show_table()  # Showdown
-            self.get_action()  # TODO-debug
-
+            self.advance_round()
+            self.show_round(always=True)  # Showdown
             self.decide_winner()
+        raise RuntimeError('TODO: declare the game winner here')
 
     def begin_round(self):
         self.board = []
@@ -454,11 +391,7 @@ class Game:
             player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
             player.seen_cards = '       ' if not player.in_hand else '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
 
-    def show_table_and_get_action(self):
-        self.show_table()
-        self.get_action()
-
-    def show_table(self):
+    def show_round(self, always=False):
         print('                                        === ' + ROUND_NAME[self.betting_round] + ' ===      ')
         print('                          Board: ', end='')
         print(self.board)

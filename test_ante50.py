@@ -281,8 +281,10 @@ def test_game_players_cycle():
 
 
 # TODO: create game n=2, fold at each stage and check board and deck are correctly allocated
-def test_mpatch_for_user_input(monkeypatch):
-    monkeypatch.setattr('builtins.input', lambda _: 'Wat')
-    textin = input('lightning talk')
-    assert textin == 'Wat'
+def test_headsup_game_variable_allocation(monkeypatch):
+    pass
 
+
+# TODO: modify a game to use and award side pots
+def test_side_action():
+    pass
