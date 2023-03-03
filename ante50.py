@@ -33,6 +33,7 @@ from random import shuffle
 # Consts
 MAX_VER = 1
 LIMIT_BET = 2
+SHOW_ROUNDS = False
 CURSOR_UP = '\033[1A' if True else ''
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
@@ -428,6 +429,8 @@ class Game:
         self.dealer.button = True
 
     def show_round(self, always=False):
+        if not always and not SHOW_ROUNDS:
+            return
         print('                                        === ' + ROUND_NAME[self.betting_round] + ' ===      ')
         print('                          Board: ', end='')
         print(self.board)
