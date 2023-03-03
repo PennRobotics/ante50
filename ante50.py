@@ -582,7 +582,7 @@ def card_name(card):
     return f'{VALUE_NAME[value]} of {SUIT_NAME[suit]}s'
 
 
-### if __name__ == '__main__':
-###     preflop_strat = Strategy()
-###     game = Game(n=10)
-###     game.play()
+if __name__ == '__main__':
+    preflop_strat = Strategy()
+    game = Game(n=10)
+    game.play()
