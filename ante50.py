@@ -175,7 +175,7 @@ class Player:
         self.current_bet = None
         self.side_pot_idx = None
 
-    def hole_str():
+    def hole_str(self):
         assert isinstance(self.hole_cards, list)
         assert len(self.hole_cards) == 2
         assert all([isinstance(e, str) for e in self.hole_cards])
