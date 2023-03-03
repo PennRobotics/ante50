@@ -121,7 +121,7 @@ class Stats:
         # 3 = during river betting
         # 4 = after showdown
         self.hands_won  = [0, 0, 0, 0, 0]
-        self.hands_lost = [0, 0, 0, 0, 0]
+        self.hands_lost = 0
         self.chips_won  = [0, 0, 0, 0, 0]
         self.chips_lost = [0, 0, 0, 0, 0]
         self.num_folds  = [0, 0, 0, 0, 0]
@@ -129,13 +129,51 @@ class Stats:
         self.num_raises = [0, 0, 0, 0, 0]
         self.winning_hand_type = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.losing_hand_type = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        self.all_in_hands_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-        self.all_in_chips_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-        self.hole_str_cnt = Counter()  # TODO: initialize all to zero
+        self.allin_hands_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+        self.allin_chips_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+
+        all_hole_strs = [VALUES[x] + VALUES[y] for x in range(13) for y in range(x+1)] + \
+                        [VALUES[x] + VALUES[y] + 's' for x in range(13) for y in range(x)]
+
+        self.hole_str_cnt = Counter({k: 0 for k in all_hole_strs})
+
+    def print_stats(self):
+        print(f'Hands played: {self.total_hands()}')
+        print(f'  Hands won: {sum(self.hands_won)} ({self.hands_won[Round.SHOWDOWN]} at showdown)')
+        print(f'  Hands lost: {self.hands_lost}')
+        print(f'  Hands folded: {sum(self.num_folds)}')
+        print(f'Raises: {sum(self.num_raises)}')
+        print(f'Balance: {sum(self.chips_won) - sum(self.chips_lost)}')
+        print(f'  Cash won: {sum(self.chips_won)}')
+        print(f'  Cash lost: {sum(self.chips_lost)}')
+        print('-----')
+        print(f'EV: {self.calculate_ev():.3f} big blinds / hand')
+        print(f'WINNING HAND HISTOGRAM: {self.winning_hand_type}')
+        print(f'LOSING HAND HISTOGRAM: {self.losing_hand_type}')
+
+        self.print_hole_str_cnt()
+
+    def print_hole_str_cnt(self):
+        for j, x in enumerate(reversed(VALUES)):
+            for i, y in enumerate(reversed(VALUES)):
+                s = x + y + 's' if i > j else y + x
+                print(f'{s:<10}', end='')
+            print()
+            for i, y in enumerate(reversed(VALUES)):
+                s = x + y + 's' if i > j else y + x
+                print(f'{self.hole_str_cnt[s]:<10}', end='')
+            print()
+            print()
+
+    def total_hands(self):
+        return sum(self.hands_won) + self.hands_lost + sum(self.num_folds)
 
     def calculate_ev(self):
-        # TODO
-        pass
+        ''' Big blinds per hand '''
+        profit_or_loss = sum(self.chips_won) - sum(self.chips_lost)
+        profit_or_loss_bb = profit_or_loss / LIMIT_BET
+        total_hands = self.total_hands()
+        return profit_or_loss_bb / total_hands
 
 
 class Strategy:
@@ -212,21 +250,6 @@ class Player:
 
         return out_str
 
-
-# TODO-hi
-"""
-FIXME
-                                        === Showdown ===
-                          Board: ['Qc', 'Js', 'As', 'Jh', 'Qs']
-
-Winner: Plyr 6 and Plyr 7 and Plyr 8 and Plyr 9 and Plyr 10 with queens full of jacks
-
-           (D)
-         Plyr 1    Plyr 2    Plyr 3    Plyr 4      Bob     Plyr 6    Plyr 7    Plyr 8    Plyr 9    Plyr 10
-           198       198       198       198       200       202       202       202       201       201
-
-         |8s|8h|   |6d|4h|   |5c|4d|   |7c|8c|    fold     |Qd|Ts|   |5h|7s|   |2c|Kd|   |9h|6h|   |Kc|3s|
-"""
 
 class Hand:
     def __init__(self, hand_set, owner=None):
@@ -410,9 +433,7 @@ class Game:
             raise RuntimeError('Expected first player in Game.players array to have var button=True')
         self.dealer = self.players[0]
 
-    def remove_player(self, idx):
-        assert isinstance(idx, int)
-        player_to_remove = self.players[idx]
+    def remove_player(self, player_to_remove):
         assert isinstance(player_to_remove, Player)
         assert player_to_remove.in_game
 
@@ -422,8 +443,8 @@ class Game:
         playing_behind.next = playing_ahead
         playing_ahead.prev = playing_behind
 
-        if self.players[idx].button:
-            self.players[idx].button = False
+        if player_to_remove.button:
+            player_to_remove.button = False
             playing_ahead.button = True
 
         player_to_remove.in_game = False
@@ -451,7 +472,7 @@ class Game:
             self.decide_winner()
             self.show_round(always=True)  # Showdown
 
-        raise RuntimeError('TODO: exited because target_num_hands reached or active_players == 1; declare the game winner here')
+        #raise RuntimeError('TODO: exited because target_num_hands reached or active_players == 1; declare the game winner here')
 
 
     def update_bet(self, player, amount):
@@ -473,16 +494,21 @@ class Game:
         self.cum_bet_per_round.append(self.cum_bet_per_round[-1] + self.active_bet)
 
         smallest_nonzero_bet = -1
-        while smallest_nonzero_bet != self.active_bet:
+        largest_bet = max([player.current_bet for player in self.players])
+        these_bets = 0
+        while largest_bet != 0 and smallest_nonzero_bet != self.active_bet - these_bets:
             smallest_nonzero_bet = min([player.current_bet for player in self.players if player.current_bet != 0])
 
             for player in self.players:
-                player.chips -= min(player.current_bet, smallest_nonzero_bet)
-                self.chips_per_pot[-1] += min(player.current_bet, smallest_nonzero_bet)
+                this_bet = min(player.current_bet, smallest_nonzero_bet)
+                player.chips -= this_bet
+                self.chips_per_pot[-1] += this_bet
                 player.current_bet = max(player.current_bet - smallest_nonzero_bet, 0)
 
             if smallest_nonzero_bet != self.active_bet:
                 self.chips_per_pot.append(0)
+
+            largest_bet = max([player.current_bet for player in self.players])
 
         self.active_bet = 0
 
@@ -523,7 +549,7 @@ class Game:
             # ... and deal
             player.in_hand = True if player.in_game else False
             player.cum_bet = 0 if player.in_hand else None
-            player.current_bet = 0 if player.in_hand else None
+            player.current_bet = 0
             player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
             player.seen_cards = '       ' if not player.in_hand else ('|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|')
 
@@ -562,39 +588,42 @@ class Game:
         assert isinstance(action, Action)
 
         # TODO: skip action and jump to last_player_to_decide check if a player is all-in
+        if self.acting_player not in self.allin_players:
 
-        decision = Action.UNDECIDED
-        match action:
-            case Action.CHECK_OR_FOLD:
-                decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.FOLD
-            case Action.CHECK_OR_CALL:
-                decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.CALL
-            case Action.RAISE_OR_CALL:
-                decision = Action.CALL if self.active_bet == self.bet_cap else Action.RAISE
-            case _:
-                raise ValueError(f'"action" argument provided to execute() ({action.name}) is disallowed')
+            match action:
+                case Action.CHECK_OR_FOLD:
+                    decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.FOLD
+                case Action.CHECK_OR_CALL:
+                    decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.CALL
+                case Action.RAISE_OR_CALL:
+                    decision = Action.CALL if self.active_bet == self.bet_cap else Action.RAISE
+                case _:
+                    raise ValueError(f'"action" argument provided to execute() ({action.name}) is disallowed')
 
-        match decision:
-            case Action.FOLD:
-                self.acting_player.in_hand = False
-                # TODO: transfer_current_bet_chips_into_appropriate_pot
-            case Action.CHECK:
-                pass
-            case Action.CALL:
-                # TODO: check that player has enough chips
-                self.acting_player.current_bet = self.active_bet
-            case Action.RAISE:
-                # TODO: check that player has enough chips
-                if not self.active_bet:  # Bet
-                    self.active_bet = self.bet_amt
-                else:  # Raise
-                    self.active_bet = min(self.active_bet + self.bet_amt, self.bet_cap)
-                self.last_player_to_decide = self.acting_player.prev
-                        ### me.current_bet = LIMIT_BET  # TODO
-                        ### me.chips -= LIMIT_BET
+            match decision:
+                case Action.FOLD:
+                    self.acting_player.in_hand = False
+                    # TODO: transfer_current_bet_chips_into_appropriate_pot
+                case Action.CHECK:
+                    pass
+                case Action.CALL:
+                    # TODO: check that player has enough chips
+                    self.acting_player.current_bet = min(self.acting_player.chips, self.active_bet)
+                    if self.acting_player.current_bet < self.active_bet:
+                        self.allin_players.append(self.acting_player)
+                case Action.RAISE:
+                    # TODO: check that player has enough chips
+                    if not self.active_bet:  # Bet
+                        self.active_bet = self.bet_amt
+                    else:  # Raise
+                        self.active_bet = min(self.active_bet + self.bet_amt, self.bet_cap)
+                    self.last_player_to_decide = self.acting_player.prev
+                            ### me.current_bet = LIMIT_BET  # TODO
+                            ### me.chips -= LIMIT_BET
 
         if self.acting_player == self.last_player_to_decide:
             self.round_not_finished = False
+            return
 
         self.acting_player = self.acting_player.next
 
@@ -643,6 +672,8 @@ class Game:
         # TODO: fix for side pots
         showdown_pool = [Hand(set(self.board + player.hole_cards), owner=player) for player in self.players if player.in_hand]
         my_hand = [hand for hand in showdown_pool if hand.owner == self.me]
+        if my_hand != []:
+            my_hand = my_hand[0]
         i = 0
         while i < len(showdown_pool) - 1:
             outcome = showdown_pool[i].compare(showdown_pool[i+1])
@@ -663,26 +694,26 @@ class Game:
         for gets_odd, hand in enumerate(showdown_pool):
             hand.owner.chips += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
             if has_won:
-                bob_stats.chips_won[SHOWDOWN] += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
+                bob_stats.chips_won[Round.SHOWDOWN] += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
 
         for player in self.players:
-            if player.chips == 0:
-                player.in_game = False
+            if player.in_game and player.chips == 0:
+                self.remove_player(player)
             elif player.chips < 0:
                 raise RuntimeError('A player is playing on credit. This is strictly forbidden!')
 
         # TODO-debug
         if has_won:
             bob_stats.num_calls = [n+1 for n in bob_stats.num_calls]
-            bob_stats.hands_won[SHOWDOWN] += 1
+            bob_stats.hands_won[Round.SHOWDOWN] += 1
             bob_stats.winning_hand_type[my_hand.strength] += 1
         elif self.me.in_hand:
-            bob_stats.hands_lost[SHOWDOWN] += 1
-            bob_stats.chips_lost[SHOWDOWN] += me.cum_bet
+            bob_stats.hands_lost += 1
+            bob_stats.chips_lost[Round.SHOWDOWN] += self.me.cum_bet
             bob_stats.losing_hand_type[my_hand.strength] += 1
         else:  # folded
-            bob_stats.num_folds[PREFLOP] += 1
-        bob_stats.hole_str_cnt[me.hole_str()] += 1
+            bob_stats.num_folds[Round.PREFLOP] += 1
+        bob_stats.hole_str_cnt[self.me.hole_str()] += 1
 
 
 def reshuffle():
@@ -715,7 +746,7 @@ def card_name(card):
 if __name__ == '__main__':
     preflop_strat = Strategy()
     bob_stats = Stats()
-    print(len(bob_stats.hole_str_cnt))
-    ### game = Game(players=10, hands=-1)
-    ### game.play()
+    game = Game(players=10, hands=1000)
+    game.play()
+    bob_stats.print_stats()
 
