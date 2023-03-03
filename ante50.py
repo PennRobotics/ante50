@@ -181,6 +181,7 @@ class Player:
         assert len(self.hole_cards) == 2
         assert all([isinstance(e, str) for e in self.hole_cards])
         assert all([len(e) == 2 for e in self.hole_cards])
+        assert self.hole_cards[0] != self.hole_cards[1]
 
         values, suits = zip(*self.hole_cards)
         print(self.hole_cards)  # TODO-debug
@@ -573,7 +574,9 @@ def card_name(card):
 # TODO-debug
 plyr = Player(npc=False)
 reshuffle()
-plyr.hole_cards = [ draw_card(), draw_card(), ]
+#plyr.hole_cards = [ draw_card(), draw_card(), ]
+plyr.hole_cards = [ draw_card(), ]
+plyr.hole_cards.append(plyr.hole_cards[0])
 hole_str = plyr.hole_str()
 print('HS')
 print(hole_str)
