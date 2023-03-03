@@ -454,11 +454,13 @@ class Game:
                 raise ValueError(f'"action" argument provided to execute() ({action.name}) is disallowed')
 
         print(action.name)  # TODO-debug
+        print(decision.name)  # TODO-debug
+
         match decision:
             case Action.FOLD:
                 raise RuntimeError('TODO')
             case Action.CHECK:
-                raise RuntimeError('TODO')
+                pass
             case Action.CALL:
                 raise RuntimeError('TODO')
             case Action.RAISE:
