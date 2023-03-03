@@ -520,7 +520,7 @@ class Game:
                 self.board.append( draw_card() )
             case 4:
                 for player in self.players:
-                    player.seen_cards = ' fold  ' if not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+                    player.seen_cards = ' fold  ' if player.in_game and not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
 
     def decide_winner(self):
         # TODO: for each player in the outermost pot, test against neighbor until only players with "0" compare remain.
