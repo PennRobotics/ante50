@@ -465,7 +465,7 @@ class Game:
             case Action.CHECK:
                 pass
             case Action.CALL:
-                self.active_player.current_bet = self.active_bet
+                self.acting_player.current_bet = self.active_bet
             case Action.RAISE:
                 self.active_bet = min(self.active_bet + self.bet_amt, self.bet_cap)
                 self.last_player_to_decide = self.acting_player.prev
