@@ -411,6 +411,7 @@ class Game:
         # ... and deal
         for player in self.players:
             player.in_hand = True if player.in_game else False
+            player.current_bet = 0 if player.in_hand else None
             player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
             player.seen_cards = '       ' if not player.in_hand else '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
 
