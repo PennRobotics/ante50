@@ -159,11 +159,11 @@ class Strategy:
         i, j = (i, j) if suited else (j, i)
 
         match self.strength_table[i][j]:
-            case 8 | 7 | 6 | 5:
+            case 8 | 7:
                 return Action.RAISE_OR_CALL
-            case 4 | 3:
+            case 6 | 5 | 4:
                 return Action.CHECK_OR_CALL
-            case 2 | 1 | 0:
+            case 3 | 2 | 1 | 0:
                 return Action.CHECK_OR_FOLD
             case _:
                 raise RuntimeError('strength_table has an unexpected value')  # TODO: make this error better
