@@ -185,6 +185,7 @@ class Player:
         self.seen_cards = '       '
         self.button = False
         self.table_pos = None
+        self.cum_bet = None
         self.current_bet = None
         self.side_pot_idx = None
 
@@ -332,6 +333,8 @@ class Game:
         self.acting_player = None
         self.last_player_to_decide = None
         self.chips_per_pot = []
+        self.allin_players = []
+        self.cum_bet_per_round = []
 
         # Create group of players with user-controlled player in the middle
         players -= 1
@@ -403,25 +406,78 @@ class Game:
 
         raise RuntimeError('TODO: exited because target_num_hands reached or active_players == 1; declare the game winner here')
 
+
+    def update_bet(self, player, amount):
+        assert isinstance(player, Player)
+        assert isinstance(amount, int)
+        assert amount > 0
+
+        chips_avail = max(0, player.chips - self.cum_bet_per_round[-1])
+        player.current_bet = chips_avail if chips_avail < amount else amount
+        player.cum_bet = self.cum_bet_per_round[-1] + player.current_bet
+
+        if chips_avail == 0 and player not in self.allin_players:
+            self.allin_players.append(player)
+
+    def put_bets_into_pot(self):
+        self.cum_bet_per_round.append(self.cum_bet_per_round[-1] + self.active_bet)
+
+        smallest_nonzero_bet = -1
+        while smallest_nonzero_bet != self.active_bet:
+            print('P:')
+            print([player.current_bet for player in self.players])
+            print([player.current_bet for player in self.players if player.current_bet != 0])
+            smallest_nonzero_bet = min([player.current_bet for player in self.players if player.current_bet != 0])  # TODO-debug
+
+            for player in self.players:
+                player.chips -= min(player.current_bet, smallest_nonzero_bet)
+                self.chips_per_pot[-1] += min(player.current_bet, smallest_nonzero_bet)
+                player.current_bet = max(player.current_bet - smallest_nonzero_bet, 0)
+
+            if smallest_nonzero_bet != self.active_bet:
+                self.chips_per_pot.append(0)
+
+        self.active_bet = 0
+
+    def fold_player(self, player):
+        assert isinstance(player, Player)
+        assert player.in_hand == True
+
+        player.in_hand = False
+
     def begin_round(self):
+        self.round_not_finished = True
         self.num_hands += 1
         self.chips_per_pot = [0]
+        self.allin_players = [None]
+        self.cum_bet_per_round = [0]
         self.board = []
         self.betting_round = 0
+        self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
 
         if self.num_hands > 1:
             self.advance_button()
 
+        if self.active_players > 2:
+            self.update_bet(self.dealer.next, self.bet_amt // 2)  # Small blind
+            self.update_bet(self.dealer.next.next, self.bet_amt)  # Big blind
+            self.acting_player = self.dealer.next.next.next
+            self.active_bet = self.bet_amt  # needed for when big blind does not have enough chips
+        else:
+            self.update_bet(self.dealer, self.bet_amt // 2)  # Small blind
+            self.update_bet(self.dealer.next, self.bet_amt)  # Big blind
+            self.acting_player = self.dealer
+
+        self.active_bet = self.bet_amt
+
         reshuffle()
-        # ... and deal
         for player in self.players:
+            # ... and deal
             player.in_hand = True if player.in_game else False
+            player.cum_bet = 0 if player.in_hand else None
             player.current_bet = 0 if player.in_hand else None
             player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
             player.seen_cards = '       ' if not player.in_hand else ('|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|')
-
-        self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
-        self.round_not_finished = True
 
     def advance_button(self):
         self.dealer.button = False
@@ -490,7 +546,9 @@ class Game:
     def get_action(self):
         assert self.betting_round < 4
 
-        self.acting_player = self.dealer.next if self.betting_round > 0 else (self.dealer.next.next.next if self.active_players > 2 else self.dealer)
+        if self.betting_round > 0:
+            self.acting_player = self.dealer.next
+
         self.last_player_to_decide = self.acting_player.prev
 
         # TODO: fix betting, chip values
@@ -504,6 +562,7 @@ class Game:
 
     def advance_round(self):
         # TODO: active_players ... num_players = sum([1 if player.in_hand else 0 for player in self.players])
+        self.put_bets_into_pot()
         self.betting_round += 1
         draw_card()  # burn card
         match self.betting_round:
@@ -575,5 +634,6 @@ def card_name(card):
 
 if __name__ == '__main__':
     preflop_strat = Strategy()
-    game = Game(players=10, hands=100)
+    game = Game(players=10, hands=1)
     game.play()
+
