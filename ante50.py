@@ -442,6 +442,8 @@ class Game:
     def execute(self, action):
         assert isinstance(action, Action)
 
+        # TODO: skip action and jump to last_player_to_decide check if a player is all-in
+
         decision = Action.UNDECIDED
         match action:
             case Action.CHECK_OR_FOLD:
@@ -449,7 +451,7 @@ class Game:
             case Action.CHECK_OR_CALL:
                 decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.CALL
             case Action.RAISE_OR_CALL:
-                decision = Action.CALL if self.active_bet == self.max_bet else Action.RAISE
+                decision = Action.CALL if self.active_bet == self.bet_cap else Action.RAISE
             case _:
                 raise ValueError(f'"action" argument provided to execute() ({action.name}) is disallowed')
 
@@ -462,9 +464,10 @@ class Game:
             case Action.CHECK:
                 pass
             case Action.CALL:
-                raise RuntimeError('TODO')
+                self.active_player.current_bet = self.active_bet
             case Action.RAISE:
-                raise RuntimeError('TODO')
+                self.active_bet = min(self.active_bet + self.bet_amt, self.bet_cap)
+                self.last_player_to_decide = self.acting_player.prev
             case _:
                 print('testme')  # TODO-debug
                 raise ValueError(f'"decision" value assigned by execute() ({action.name}) is disallowed')
