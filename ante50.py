@@ -204,6 +204,21 @@ class Player:
         return out_str
 
 
+# TODO-hi
+"""
+FIXME
+                                        === Showdown ===
+                          Board: ['Qc', 'Js', 'As', 'Jh', 'Qs']
+
+Winner: Plyr 6 and Plyr 7 and Plyr 8 and Plyr 9 and Plyr 10 with queens full of jacks
+
+           (D)
+         Plyr 1    Plyr 2    Plyr 3    Plyr 4      Bob     Plyr 6    Plyr 7    Plyr 8    Plyr 9    Plyr 10
+           198       198       198       198       200       202       202       202       201       201
+
+         |8s|8h|   |6d|4h|   |5c|4d|   |7c|8c|    fold     |Qd|Ts|   |5h|7s|   |2c|Kd|   |9h|6h|   |Kc|3s|
+"""
+
 class Hand:
     def __init__(self, hand_set, owner=None):
         assert isinstance(hand_set, set)
@@ -285,7 +300,6 @@ class Hand:
                     d_sorted_suit_idxs = ''.join([str(b-a) for (a, b) in pairwise(sorted_suit_idxs)])
                     best_match_idx = d_sorted_suit_idxs.rfind('1111')
                     if best_match_idx >= 0 or steel_wheel:
-                        print(sorted_suit_idxs)
                         self.strength = HandRank.STFU if steel_wheel or sorted_suit_idxs[best_match_idx+4] < 12 else HandRank.ROYAL
                         self.rank = [3] if steel_wheel and best_match_idx == -1 else [sorted_suit_idxs[best_match_idx+4]]
 
@@ -349,7 +363,7 @@ class Game:
             player.in_game = True
             player.button = True if i == 1 else False
             player.name = f'Plyr {i:<2}' if player.npc else '  Bob  '
-            player.chips = 5000
+            player.chips = 100 * LIMIT_BET
             player.table_pos = i
 
         # Circular linked list
@@ -426,7 +440,6 @@ class Game:
         self.cum_bet_per_round.append(self.cum_bet_per_round[-1] + self.active_bet)
 
         smallest_nonzero_bet = -1
-        print(self.active_bet)
         while smallest_nonzero_bet != self.active_bet:
             smallest_nonzero_bet = min([player.current_bet for player in self.players if player.current_bet != 0])
 
@@ -453,6 +466,7 @@ class Game:
         self.allin_players = [None]
         self.cum_bet_per_round = [0]
         self.board = []
+        self.winners = None
         self.betting_round = 0
         self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
 
@@ -493,7 +507,14 @@ class Game:
         print(self.board)
         print()
         if self.betting_round == 4:
-            print('Winner:')
+            winner_str = ' and '.join([w.strip() for w in self.winners[0]]) + ' with '
+            if self.winners[1][0][-1] != 's' or self.winners[1][0][0] == 'p':
+                if self.winners[1][0][0] == 'a' and self.winners[1][0][3] != 's' or self.winners[1][0][0] == 'e' and self.winners[1][0][5] != 's':
+                    winner_str += 'an '
+                else:
+                    winner_str += 'a '
+            winner_str += self.winners[1][0]
+            print(f'Winner: {winner_str}')
         else:
             print('Action ->')
         print()
@@ -586,6 +607,7 @@ class Game:
         # TODO: for each player in the outermost pot, test against neighbor until only players with "0" compare remain.
         #   Then, split the pot between these players. Open the next pot and repeat until all cash is settled.
 
+        # TODO: fix for side pots
         showdown_pool = [Hand(set(self.board + player.hole_cards), owner=player) for player in self.players if player.in_hand]
         i = 0
         while i < len(showdown_pool) - 1:
@@ -598,8 +620,7 @@ class Game:
             else:
                 i += 1
 
-        print([hand.owner.name for hand in showdown_pool])
-        print([str(hand) for hand in showdown_pool])  # TODO-debug
+        self.winners = [[hand.owner.name for hand in showdown_pool], [str(hand) for hand in showdown_pool],]
 
         chips_per_shove, total_odd_chips = divmod(self.chips_per_pot[-1], len(showdown_pool))
         for gets_odd, hand in enumerate(showdown_pool):
@@ -635,6 +656,6 @@ def card_name(card):
 
 if __name__ == '__main__':
     preflop_strat = Strategy()
-    game = Game(players=10, hands=1)
+    game = Game(players=10, hands=2)
     game.play()
 
