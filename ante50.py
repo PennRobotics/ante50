@@ -65,16 +65,16 @@ ROUND_NAME = { 0: 'Pre-flop',
                4: 'Showdown' }
 
 class HandRank(IntEnum):
-    HIGH_CARD = auto()
-    PAIR = auto()
-    TWO_PAIR = auto()
-    TRIPS = auto()
-    STRAIGHT = auto()
-    FLUSH = auto()
-    HOUSE = auto()
-    QUADS = auto()
-    STFU = auto()
-    ROYAL = auto()
+    HIGH_CARD = 1
+    PAIR      = 2
+    TWO_PAIR  = 3
+    TRIPS     = 4
+    STRAIGHT  = 5
+    FLUSH     = 6
+    HOUSE     = 7
+    QUADS     = 8
+    STFU      = 9
+    ROYAL     = 10
 
 class Action(IntEnum):
     CHECK_OR_FOLD = 1
