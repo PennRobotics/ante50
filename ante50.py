@@ -152,15 +152,21 @@ class Strategy:
         assert len(hole_str) == 2 or len(hole_str) == 3 and hole_str[2] == 's'
         assert all([v in VALUES for v in hole_str[0:2]])
 
-        if len(hole_str) == 3:
-            suited = True
+        suited = True if len(hole_str) == 3 else False
 
-        i = VALUES.index(hole_str[0])
-        j = VALUES.index(hole_str[1])
+        print(hole_str)  # TODO-debug
+
+        i = 12 - VALUES.index(hole_str[0])
+        j = 12 - VALUES.index(hole_str[1])
         print('ST')
-        print(self.strength_table)
+        print('\n'.join([''.join(str(n)) for n in self.strength_table]))
         print('idx')
-        print(i, j)
+        if suited:
+            print(i, j)
+            print(self.strength_table[i][j])
+        else:
+            print(j, i)
+            print(self.strength_table[j][i])
 
         return "todo"
 
