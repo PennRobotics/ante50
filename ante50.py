@@ -184,10 +184,10 @@ class Player:
         assert self.hole_cards[0] != self.hole_cards[1]
 
         values, suits = zip(*self.hole_cards)
-        print(self.hole_cards)  # TODO-debug
 
         out_str = ''.join([VALUES[i] for i in sorted([VALUES.index(v) for v in values], reverse=True)])
         out_str += 's' if suits[0] == suits[1] else ''
+
         return out_str
 
 
@@ -572,14 +572,12 @@ def card_name(card):
 
 
 # TODO-debug
+pfs = Strategy()
 plyr = Player(npc=False)
 reshuffle()
-#plyr.hole_cards = [ draw_card(), draw_card(), ]
-plyr.hole_cards = [ draw_card(), ]
-plyr.hole_cards.append(plyr.hole_cards[0])
+plyr.hole_cards = [ draw_card(), draw_card(), ]
 hole_str = plyr.hole_str()
-print('HS')
-print(hole_str)
+print(pfs.get_preflop_action(hole_str))
 
 
 ### if __name__ == '__main__':
