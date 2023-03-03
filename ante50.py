@@ -1,30 +1,25 @@
 # TODO
 # ====
 # Close up existing TODO tags
-# Side pots (and odd chips)
-# Arrays (n=2..10) containing ideal starting hand strength
+# Side pots (and odd chips) correctly distributed
+# Provide modifiable stats as a JSON
+# Decision maker (strategy) is imported and called
+
+# TODO: put docstrings for each major code block:
 # Strategy class
-# - (per round)
-# - (per opponent)
-# - (per situation)
-# - (per current hand)
-# - to start: fold/call/raise percentage with per-round inertia
-# - (integer versions: start with 1)
+# - currently, only implements position-agnostic pre-flop hand strength for a full table
 # Stats
 # - win/loss hand count
 # - win/loss cash amount
 # - per round: number of folds, calls, raises
 # Player class
 # - avail cash
-# - hand history as stats class
-# - strategy as strategy class
 # Game class
-# - stakes, incl. limit/no-limit/in between
+# - limit stakes for now
 # - players
 # - handle each round
 # - get input
-# Provide modifiable stats as a JSON (with min version for each stat, for backwards compat)
-# Decision maker (strategy) is imported and called
+
 
 
 # Imports
@@ -80,17 +75,14 @@ class HandRank(IntEnum):
     ROYAL = auto()
 
 class Action(IntEnum):
-    FOLD = 1
-    CALL = 2
-    RAISE = 3
-
-class Position(IntEnum):
-    IGNORE = -1
-    EARLY = 1
-    MIDDLE = 2
-    LATE = 3
-    SB = 4
-    BB = 5
+    CHECK_OR_FOLD = 1
+    CHECK_OR_CALL = 2
+    RAISE_OR_CALL = 3
+    FOLD = auto()
+    CHECK = auto()
+    CALL = auto()
+    RAISE = auto()
+    UNDECIDED = 0
 
 HAND_NAME = {HandRank.HIGH_CARD: '{} high',
              HandRank.PAIR: 'pair of {}s',
@@ -154,10 +146,9 @@ class Strategy:
                 [0,0,0,0,0,0,0,0,0,0,0,0,2]] # 2
                 # (off-suit)
 
-    def get_preflop_action(self, hole_str, seat_pos):
+    def get_preflop_action(self, hole_str):
         assert isinstance(hole_str, str)
         assert len(hole_str) == 2 or len(hole_str) == 3 and hole_str[2] == 's'
-        # TODO: assert Enum type of seat pos
         if len(hole_str) == 3:
             suited = True
         # TODO: get index of each card, sort uniformly
@@ -177,11 +168,25 @@ class Player:
         self.chips = 0
         self.in_game = False
         self.in_hand = False
+        self.hole_cards = None
         self.seen_cards = '       '
         self.button = False
         self.table_pos = None
         self.current_bet = None
         self.side_pot_idx = None
+
+    def hole_str():
+        assert isinstance(self.hole_cards, list)
+        assert len(self.hole_cards) == 2
+        assert all([isinstance(e, str) for e in self.hole_cards])
+        assert all([len(e) == 2 for e in self.hole_cards])
+
+        values, suits = zip(*self.hole_cards)
+        print('VS')
+        print(values)
+        print(suits)
+
+        out_str.append('' if hole_cards[0][1] != hole_cards[1][1] else 's')
 
 
 class Hand:
@@ -301,9 +306,12 @@ class Game:
         assert isinstance(n, int)
         assert n > 1 and n <= 10
         self.betting_round = -1
-        self.active_players = n
+        self.round_not_finished = None
         self.num_hands = 0
+        self.active_players = n
         self.active_bet = None
+        self.acting_player = None
+        self.last_player_to_decide = None
         self.chips_per_pot = []
 
         # Create group of players with user-controlled player in the middle
@@ -376,20 +384,27 @@ class Game:
         raise RuntimeError('TODO: declare the game winner here')
 
     def begin_round(self):
-        self.board = []
-        self.chips_per_pot = [0]
-        reshuffle()
-        self.betting_round = 0
         self.num_hands += 1
-        if self.num_hands > 1:
-            self.dealer.button = False
-            self.dealer = self.dealer.next
-            self.dealer.button = True
+        self.chips_per_pot = [0]
+        self.board = []
+        self.betting_round = 0
 
+        if self.num_hands > 1:
+            self.advance_button()
+
+        reshuffle()
+        # ... and deal
         for player in self.players:
             player.in_hand = True if player.in_game else False
             player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
             player.seen_cards = '       ' if not player.in_hand else '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+
+        self.round_not_finished = True
+
+    def advance_button(self):
+        self.dealer.button = False
+        self.dealer = self.dealer.next
+        self.dealer.button = True
 
     def show_round(self, always=False):
         print('                                        === ' + ROUND_NAME[self.betting_round] + ' ===      ')
@@ -408,21 +423,59 @@ class Game:
         print('         ' + '   '.join([player.seen_cards for player in self.players]) )
         print()
 
-    def get_action(self):
-        if self.betting_round == 4:  # TODO-debug
-            print()  # TODO-debug
-            print()  # TODO-debug
-            input()  # TODO-debug
-            return  # TODO-debug
+    def execute(self, player, action):
+        assert isinstance(player, Player)
+        assert isinstance(action, Action)
 
-        final_player = self.dealer
-        current_player = self.dealer.next
+        decision = Action.UNDECIDED
+        match action:
+            case Action.CHECK_OR_FOLD:
+                decision = Action.CHECK if self.current_bet == player.current_bet else Action.FOLD
+            case Action.CHECK_OR_CALL:
+                decision = Action.CHECK if self.current_bet == player.current_bet else Action.CALL
+            case Action.RAISE_OR_CALL:
+                decision = Action.CALL if self.current_bet == self.max_bet else Action.RAISE
+            case _:
+                raise ValueError(f'"action" argument provided to execute() ({action.name}) is disallowed')
+
+        match decision:
+            case Action.FOLD:
+                pass
+            case Action.CHECK:
+                pass
+            case Action.CALL:
+                pass
+            case Action.RAISE:
+                pass
+            case _:
+                print('testme')  # TODO-debug
+                raise ValueError(f'"decision" value assigned by execute() ({action.name}) is disallowed')
+
+        if player == self.last_player_to_decide:
+            # TODO: declare round "over"
+            pass
+
+
+    def get_action(self):
+        assert self.betting_round < 4
+        assert self.last_player_to_decide == None
+        assert self.acting_player == None
+
+        self.acting_player = self.dealer.next if self.betting_round > 0 else (self.dealer.next.next.next if self.active_players > 2 else self.dealer)
+        self.last_player_to_decide = self.acting_player.prev
+
+        # TODO-debug: test that execute() fails with invalid arg
+        self.execute(self.dealer, Action.FOLD)
 
         # TODO: this entire thing needs a revamp. If a betting action occurs, final_player and absolute_bet_right_now needs updating.
         absolute_bet_right_now = LIMIT_BET  # TODO-debug
-        while True:
+        while self.round_not_finished:
             if current_player.npc:
-                action = current_player.strategy.get_preflop_action('AKs', Position.IGNORE)  # TODO
+                action = Action.CHECK_OR_CALL
+            else:
+                hole_str = current_player.hole_str()
+                action = preflop_strat.get_preflop_action(hole_str)
+                self.execute(action)
                 if action == Action.FOLD:
                     if current_player.current_bet < absolute_bet_right_now:
                         current_player.fold()  # TODO: belongs somewhere else?
@@ -472,7 +525,7 @@ class Game:
         print(CURSOR_UP * 14)
 
     def advance_round(self):
-        num_players = sum([1 if player.in_hand else 0 for player in self.players])
+        # TODO: active_players ... num_players = sum([1 if player.in_hand else 0 for player in self.players])
         self.betting_round += 1
         draw_card()  # burn card
         match self.betting_round:
@@ -542,6 +595,16 @@ def card_name(card):
     return f'{VALUE_NAME[value]} of {SUIT_NAME[suit]}s'
 
 
-if __name__ == '__main__':
-    game = Game(n=10, v=1)
-    game.play()
+# TODO-debug
+plyr = Player(npc=False)
+reshuffle()
+plyr.hole_cards = [ draw_card(), draw_card(), ]
+hole_str = plyr.hole_str()
+print('HS')
+print(hole_str)
+
+
+### if __name__ == '__main__':
+###     preflop_strat = Strategy()
+###     game = Game(n=10)
+###     game.play()
