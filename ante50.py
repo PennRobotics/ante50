@@ -315,27 +315,30 @@ class Hand:
 
 
 class Game:
-    def __init__(self, n=5):
-        assert isinstance(n, int)
-        assert n > 1 and n <= 10
+    def __init__(self, players=5, hands=-1):
+        assert isinstance(players, int)
+        assert isinstance(hands, int)
+        assert players > 1 and players <= 10
+
         self.betting_round = -1
         self.bet_amt = 0
         self.bet_cap = 0
         self.round_not_finished = None
         self.num_hands = 0
-        self.active_players = n
+        self.target_num_hands = hands
+        self.active_players = players
         self.active_bet = None
         self.acting_player = None
         self.last_player_to_decide = None
         self.chips_per_pot = []
 
         # Create group of players with user-controlled player in the middle
-        n -= 1
-        mid_idx = n // 2
+        players -= 1
+        mid_idx = players // 2
         self.players = [Player() for _ in range(mid_idx)]
         self.players.append( Player(npc=False) )
         self.me = mid_idx
-        self.players += [Player() for _ in range(n - mid_idx)]
+        self.players += [Player() for _ in range(players - mid_idx)]
 
         # Give players names, chips, and a dealer button
         for i, player in enumerate(self.players, 1):
@@ -376,7 +379,7 @@ class Game:
         self.active_players -= 1
 
     def play(self):
-        while self.active_players > 1:
+        while self.active_players > 1 and self.num_hands != self.target_num_hands:
             self.begin_round()
             self.show_round()  # Pre-flop
             self.get_action()
@@ -396,7 +399,8 @@ class Game:
             self.advance_round()
             self.show_round(always=True)  # Showdown
             self.decide_winner()
-        raise RuntimeError('TODO: declare the game winner here')
+
+        raise RuntimeError('TODO: exited because target_num_hands reached or active_players == 1; declare the game winner here')
 
     def begin_round(self):
         self.num_hands += 1
@@ -568,5 +572,5 @@ def card_name(card):
 
 if __name__ == '__main__':
     preflop_strat = Strategy()
-    game = Game(n=10)
+    game = Game(players=10, hands=100)
     game.play()
