@@ -25,7 +25,7 @@
 
 # Imports
 from collections import Counter
-from enum import IntEnum, auto
+from enum import IntEnum
 from itertools import pairwise
 from random import shuffle
 
@@ -58,33 +58,40 @@ VALUE_NAME = { '2': 'deuce',
                'K': 'king',
                'A': 'ace' }
 
-ROUND_NAME = { 0: 'Pre-flop',
-               1: 'Flop',
-               2: 'Turn',
-               3: 'River',
-               4: 'Showdown' }
+class Round(IntEnum):
+    PREFLOP = 0
+    FLOP = 1
+    TURN = 2
+    RIVER = 3
+    SHOWDOWN = 4
+
+ROUND_NAME = { Round.PREFLOP: 'Pre-flop',
+               Round.FLOP: 'Flop',
+               Round.TURN: 'Turn',
+               Round.RIVER: 'River',
+               Round.SHOWDOWN: 'Showdown' }
 
 class HandRank(IntEnum):
-    HIGH_CARD = 1
-    PAIR      = 2
-    TWO_PAIR  = 3
-    TRIPS     = 4
-    STRAIGHT  = 5
-    FLUSH     = 6
-    HOUSE     = 7
-    QUADS     = 8
-    STFU      = 9
-    ROYAL     = 10
+    HIGH_CARD = 0
+    PAIR      = 1
+    TWO_PAIR  = 2
+    TRIPS     = 3
+    STRAIGHT  = 4
+    FLUSH     = 5
+    HOUSE     = 6
+    QUADS     = 7
+    STFU      = 8
+    ROYAL     = 9
 
 class Action(IntEnum):
+    UNDECIDED = 0
     CHECK_OR_FOLD = 1
     CHECK_OR_CALL = 2
     RAISE_OR_CALL = 3
-    FOLD = auto()
-    CHECK = auto()
-    CALL = auto()
-    RAISE = auto()
-    UNDECIDED = 0
+    FOLD = 4
+    CHECK = 5
+    CALL = 6
+    RAISE = 7
 
 HAND_NAME = {HandRank.HIGH_CARD: '{} high',
              HandRank.PAIR: 'pair of {}s',
@@ -113,16 +120,18 @@ class Stats:
         # 2 = during turn betting
         # 3 = during river betting
         # 4 = after showdown
-        hands_won  = [0, 0, 0, 0, 0]
-        hands_lost = [0, 0, 0, 0, 0]
-        chips_won  = [0, 0, 0, 0, 0]
-        chips_lost = [0, 0, 0, 0, 0]
-        num_folds  = [0, 0, 0, 0, 0]
-        num_calls  = [0, 0, 0, 0, 0]
-        num_raises = [0, 0, 0, 0, 0]
-        all_in_hands_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-        all_in_chips_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-        hole_str_cnt = Counter()  # TODO: initialize all to zero
+        self.hands_won  = [0, 0, 0, 0, 0]
+        self.hands_lost = [0, 0, 0, 0, 0]
+        self.chips_won  = [0, 0, 0, 0, 0]
+        self.chips_lost = [0, 0, 0, 0, 0]
+        self.num_folds  = [0, 0, 0, 0, 0]
+        self.num_calls  = [0, 0, 0, 0, 0]
+        self.num_raises = [0, 0, 0, 0, 0]
+        self.winning_hand_type = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.losing_hand_type = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.all_in_hands_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+        self.all_in_chips_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
+        self.hole_str_cnt = Counter()  # TODO: initialize all to zero
 
     def calculate_ev(self):
         # TODO
@@ -343,9 +352,6 @@ class Hand:
         assert len(self.hand_set | other.hand_set) == 9
         assert len(self.hand_set & other.hand_set) == 5
 
-        print(self.hand_set, self.strength.name, self.rank)
-        print(other.hand_set, other.strength.name, other.rank)
-
         if self.strength != other.strength:
             return 1 if self.strength > other.strength else -1
 
@@ -382,7 +388,7 @@ class Game:
         mid_idx = players // 2
         self.players = [Player() for _ in range(mid_idx)]
         self.players.append( Player(npc=False) )
-        self.me = mid_idx
+        self.me = self.players[mid_idx]
         self.players += [Player() for _ in range(players - mid_idx)]
 
         # Give players names, chips, and a dealer button
@@ -552,8 +558,6 @@ class Game:
         print('         ' + '   '.join([player.seen_cards for player in self.players]) )
         print()
 
-        assert len(winner_str) < 50
-
     def execute(self, action):
         assert isinstance(action, Action)
 
@@ -638,6 +642,7 @@ class Game:
 
         # TODO: fix for side pots
         showdown_pool = [Hand(set(self.board + player.hole_cards), owner=player) for player in self.players if player.in_hand]
+        my_hand = [hand for hand in showdown_pool if hand.owner == self.me]
         i = 0
         while i < len(showdown_pool) - 1:
             outcome = showdown_pool[i].compare(showdown_pool[i+1])
@@ -649,13 +654,35 @@ class Game:
                 i = 0
             else:
                 i += 1
-            print(len(showdown_pool))
 
         self.winners = [[hand.owner.name for hand in showdown_pool], [str(hand) for hand in showdown_pool],]
+
+        has_won = True if self.me in [hand.owner for hand in showdown_pool] else False
 
         chips_per_shove, total_odd_chips = divmod(self.chips_per_pot[-1], len(showdown_pool))
         for gets_odd, hand in enumerate(showdown_pool):
             hand.owner.chips += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
+            if has_won:
+                bob_stats.chips_won[SHOWDOWN] += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
+
+        for player in self.players:
+            if player.chips == 0:
+                player.in_game = False
+            elif player.chips < 0:
+                raise RuntimeError('A player is playing on credit. This is strictly forbidden!')
+
+        # TODO-debug
+        if has_won:
+            bob_stats.num_calls = [n+1 for n in bob_stats.num_calls]
+            bob_stats.hands_won[SHOWDOWN] += 1
+            bob_stats.winning_hand_type[my_hand.strength] += 1
+        elif self.me.in_hand:
+            bob_stats.hands_lost[SHOWDOWN] += 1
+            bob_stats.chips_lost[SHOWDOWN] += me.cum_bet
+            bob_stats.losing_hand_type[my_hand.strength] += 1
+        else:  # folded
+            bob_stats.num_folds[PREFLOP] += 1
+        bob_stats.hole_str_cnt[me.hole_str()] += 1
 
 
 def reshuffle():
@@ -687,6 +714,8 @@ def card_name(card):
 
 if __name__ == '__main__':
     preflop_strat = Strategy()
-    game = Game(players=10, hands=-1)
-    game.play()
+    bob_stats = Stats()
+    print(len(bob_stats.hole_str_cnt))
+    ### game = Game(players=10, hands=-1)
+    ### game.play()
 
