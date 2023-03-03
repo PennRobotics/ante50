@@ -1,30 +1,26 @@
 # TODO
 # ====
 # Close up existing TODO tags
-# Side pots (and odd chips)
-# Arrays (n=2..10) containing ideal starting hand strength
+# Side pots (and odd chips) correctly distributed
+# Provide modifiable stats as a JSON
+# Decision maker (strategy) is imported and called
+# Function to sort by card value (instead of calling VALUES[sorted(VALUES.index(v))])
+
+# TODO: put docstrings for each major code block:
 # Strategy class
-# - (per round)
-# - (per opponent)
-# - (per situation)
-# - (per current hand)
-# - to start: fold/call/raise percentage with per-round inertia
-# - (integer versions: start with 1)
+# - currently, only implements position-agnostic pre-flop hand strength for a full table
 # Stats
 # - win/loss hand count
 # - win/loss cash amount
 # - per round: number of folds, calls, raises
 # Player class
 # - avail cash
-# - hand history as stats class
-# - strategy as strategy class
 # Game class
-# - stakes, incl. limit/no-limit/in between
+# - limit stakes for now
 # - players
 # - handle each round
 # - get input
-# Provide modifiable stats as a JSON (with min version for each stat, for backwards compat)
-# Decision maker (strategy) is imported and called
+
 
 
 # Imports
@@ -37,6 +33,7 @@ from random import shuffle
 # Consts
 MAX_VER = 1
 LIMIT_BET = 2
+SHOW_ROUNDS = False
 CURSOR_UP = '\033[1A' if True else ''
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
@@ -80,17 +77,14 @@ class HandRank(IntEnum):
     ROYAL = auto()
 
 class Action(IntEnum):
-    FOLD = 1
-    CALL = 2
-    RAISE = 3
-
-class Position(IntEnum):
-    IGNORE = -1
-    EARLY = 1
-    MIDDLE = 2
-    LATE = 3
-    SB = 4
-    BB = 5
+    CHECK_OR_FOLD = 1
+    CHECK_OR_CALL = 2
+    RAISE_OR_CALL = 3
+    FOLD = auto()
+    CHECK = auto()
+    CALL = auto()
+    RAISE = auto()
+    UNDECIDED = 0
 
 HAND_NAME = {HandRank.HIGH_CARD: '{} high',
              HandRank.PAIR: 'pair of {}s',
@@ -112,10 +106,7 @@ unknown = set(deck)
 
 
 class Stats:
-    def __init__(self, v=1):
-        if v < 1 or v > MAX_VER:
-            raise ValueError(f'Invalid version argument provided to Strategy class: {v}')
-
+    def __init__(self):
         # Indexes:
         # 0 = during pre-flop betting
         # 1 = during flop betting
@@ -132,10 +123,6 @@ class Stats:
         all_in_hands_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
         all_in_chips_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
         hole_str_cnt = Counter()  # TODO: initialize all to zero
-        if v == 1:  return
-
-        # TODO: future version variables belong here
-        pass
 
     def calculate_ev(self):
         # TODO
@@ -143,14 +130,7 @@ class Stats:
 
 
 class Strategy:
-    def __init__(self, v=1):
-        if v < 1 or v > MAX_VER:
-            raise ValueError(f'Invalid version argument provided to Strategy class: {v}')
-
-        self.stddev_perfect_hole_selection = 0.5
-        self.stddev_perfect_bet = [0, 0, 0, 0]
-        self.position_awareness_frac = 0.8  # 0.0 to 1.0, higher is more aware
-
+    def __init__(self):
         self.strength_table = [
                 #A K Q J T 9 8 7 6 5 4 3 2 (suited)
                 [8,8,7,7,6,4,4,4,4,4,4,4,4], # A
@@ -168,28 +148,31 @@ class Strategy:
                 [0,0,0,0,0,0,0,0,0,0,0,0,2]] # 2
                 # (off-suit)
 
-        circumstance_and_modification = [('False', 'pass'),]  # TODO
-
-        if v == 1:  return
-
-        # TODO: future version variables belong here
-        pass
-
-    def get_preflop_action(self, hole_str, seat_pos):
+    def get_preflop_action(self, hole_str):
         assert isinstance(hole_str, str)
         assert len(hole_str) == 2 or len(hole_str) == 3 and hole_str[2] == 's'
-        # TODO: assert Enum type of seat pos
-        if len(hole_str) == 3:
-            suited = True
-        # TODO: get index of each card, sort uniformly
-        # TODO: convert index to table index, accounting for suited or not
+        assert all([v in VALUES for v in hole_str[0:2]])
 
-        return Action.CALL  # TODO
+        suited = True if len(hole_str) == 3 else False
+
+        i = 12 - VALUES.index(hole_str[0])
+        j = 12 - VALUES.index(hole_str[1])
+        i, j = (i, j) if suited else (j, i)
+
+        match self.strength_table[i][j]:
+            case 8 | 7:
+                return Action.RAISE_OR_CALL
+            case 6 | 5 | 4:
+                return Action.CHECK_OR_CALL
+            case 3 | 2 | 1 | 0:
+                return Action.CHECK_OR_FOLD
+            case _:
+                raise RuntimeError('strength_table has an unexpected value')  # TODO: make this error better
 
 
 class Player:
     name = ''
-    def __init__(self, v=1, npc=True):
+    def __init__(self, npc=True):
         assert isinstance(npc, bool)
         self.npc = npc
         if not npc:  return
@@ -198,55 +181,26 @@ class Player:
         self.chips = 0
         self.in_game = False
         self.in_hand = False
+        self.hole_cards = None
         self.seen_cards = '       '
         self.button = False
         self.table_pos = None
         self.current_bet = None
         self.side_pot_idx = None
-        self.stats = Stats(v=v)
-        self.strategy = Strategy(v=v)
-        if v == 1: return
 
-        # TODO: future version variables belong here
-        pass
+    def hole_str(self):
+        assert isinstance(self.hole_cards, list)
+        assert len(self.hole_cards) == 2
+        assert all([isinstance(e, str) for e in self.hole_cards])
+        assert all([len(e) == 2 for e in self.hole_cards])
+        assert self.hole_cards[0] != self.hole_cards[1]
 
+        values, suits = zip(*self.hole_cards)
 
-class OtherHolePredictor:
-    """
-    Figure out all possible combinations of cards from `unknown` and
-    likelihood of calling with each combo. For advanced analysis,
-    consider each board stage and bet. Return a priority queue with
-    a list of likely hole cards and probability of occurrence.
-    """
-    def __init__(self):
-        # TODO
-        pass
+        out_str = ''.join([VALUES[i] for i in sorted([VALUES.index(v) for v in values], reverse=True)])
+        out_str += 's' if suits[0] == suits[1] else ''
 
-
-class DrawFinder:
-    def __init__(self, hole_set, board_set, owner=None):
-        assert isinstance(hole_set, set)
-        assert isinstance(board_set, set)
-        assert len(hole_set) == 2
-        assert len(board_set) < 5
-        self.get_draws(hole_set, board_set)
-
-    def get_draws(self, hole_set, board_set):
-        cards_to_go = 5 - len(board_set)
-        hole0, hole1 = list(hole_set)
-        hole0_v, hole0_s = hole0
-        hole1_v, hole1_s = hole1
-
-        pair = hole0_v == hole1_v
-        suited = hole0_s == hole1_s
-        _dist = abs(VALUES.index(hole0_v) - VALUES.index(hole1_v))
-        connectors = _dist == 1 or _dist == 12
-
-        # Identify range of outcomes including best possible
-        # TODO
-
-        # Get number of draws to each outcome
-        # TODO
+        return out_str
 
 
 class Hand:
@@ -274,7 +228,7 @@ class Hand:
             self.strength = HandRank.FLUSH
             self.highest_cards = [VALUE_NAME[VALUES[max([VALUES.index(value) for value, suit in hand_set if suit == common_suit])]]]
             value, suit = zip(*hand_set)
-            sorted_suit_idxs = sorted([VALUES.index(value) for value, suit in hand_set if suit == common_suit])
+            sorted_suit_idxs = sorted([VALUES.index(value) for value, suit in hand_set if suit == common_suit])  # TODO: probably use reverse=True
             self.rank = list(reversed(sorted_suit_idxs))[0:5]
 
         # Check for repeated values (pair, two pair, three of a kind, full house, four of a kind)
@@ -283,21 +237,21 @@ class Hand:
         while True:
             if top_counts[0] == 4:  # 4-3 or 4-2-1 or 4-1-1-1
                 self.strength = HandRank.QUADS
-                self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:])))[0:1]
+                self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:], reverse=True))[0:1]
                 break
             if top_counts[0] == 3:
                 if top_counts[1] >= 2:
                     self.strength = HandRank.HOUSE
                     if top_counts[1] == 2:
                         if top_counts[2] == 2:  # 3-2-2
-                            self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:3])))
+                            self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:3], reverse=True))
                         else:  # 3-2-1-1
                             self.rank = top_card_idxs
                     else:  # 3-3-1
-                        self.rank = list(reversed(sorted(top_card_idxs[0:2])))
+                        self.rank = list(sorted(top_card_idxs[0:2], reverse=True))
                 else:  # 3-1-1-1-1
                     self.strength = max(self.strength, HandRank.TRIPS)
-                    self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:])))[1:4]
+                    self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:], reverse=True))[1:4]
                 break
             if self.strength == HandRank.FLUSH:
                 break
@@ -305,13 +259,13 @@ class Hand:
                 if top_counts[1] == 2:
                     self.strength = HandRank.TWO_PAIR
                     if top_counts[2] == 2:  # 2-2-2-1
-                        pairs_ranked = list(reversed(sorted(top_card_idxs[0:3])))
-                        self.rank = pairs_ranked[0:2] + list(reversed(sorted(pairs_ranked[2:3] + top_card_idxs[3:4])))[0:1]
+                        pairs_ranked = list(sorted(top_card_idxs[0:3], reverse=True))
+                        self.rank = pairs_ranked[0:2] + list(sorted(pairs_ranked[2:3] + top_card_idxs[3:4], reverse=True))[0:1]
                     else:  # 2-2-1-1-1
-                        self.rank = list(reversed(sorted(top_card_idxs[0:2]))) + list(reversed(sorted(top_card_idxs[2:])))[0:1]
+                        self.rank = list(sorted(top_card_idxs[0:2], reverse=True)) + list(sorted(top_card_idxs[2:], reverse=True))[0:1]
                 else:  # 2-1-1-1-1-1
                     self.strength = HandRank.PAIR
-                    self.rank = top_card_idxs[0:1] + list(reversed(sorted(top_card_idxs[1:])))[0:3]
+                    self.rank = top_card_idxs[0:1] + list(sorted(top_card_idxs[1:], reverse=True))[0:3]
             break
 
         # Check for straights and straight flushes
@@ -336,7 +290,7 @@ class Hand:
 
         # Get high card
         if self.strength == HandRank.HIGH_CARD:
-            self.rank = list(reversed(sorted(top_card_idxs)))[0:5]
+            self.rank = list(sorted(top_card_idxs, reverse=True))[0:5]
 
         self.highest_cards = names(self.rank)
 
@@ -362,28 +316,35 @@ class Hand:
 
 
 class Game:
-    def __init__(self, n=5, v=1):
-        assert isinstance(n, int)
-        assert isinstance(v, int)
-        assert n > 1 and n <= 10
+    def __init__(self, players=5, hands=-1):
+        assert isinstance(players, int)
+        assert isinstance(hands, int)
+        assert players > 1 and players <= 10
+
         self.betting_round = -1
-        self.active_players = n
+        self.bet_amt = 0
+        self.bet_cap = 0
+        self.round_not_finished = None
         self.num_hands = 0
+        self.target_num_hands = hands
+        self.active_players = players
         self.active_bet = None
+        self.acting_player = None
+        self.last_player_to_decide = None
         self.chips_per_pot = []
 
         # Create group of players with user-controlled player in the middle
-        n -= 1
-        mid_idx = n // 2
+        players -= 1
+        mid_idx = players // 2
         self.players = [Player() for _ in range(mid_idx)]
         self.players.append( Player(npc=False) )
         self.me = mid_idx
-        self.players += [Player() for _ in range(n - mid_idx)]
+        self.players += [Player() for _ in range(players - mid_idx)]
 
         # Give players names, chips, and a dealer button
         for i, player in enumerate(self.players, 1):
             player.in_game = True
-            player.button = True if i == 1 else False  # TODO: properly randomize
+            player.button = True if i == 1 else False
             player.name = f'Plyr {i:<2}' if player.npc else '  Bob  '
             player.chips = 5000
             player.table_pos = i
@@ -419,46 +380,57 @@ class Game:
         self.active_players -= 1
 
     def play(self):
-        while self.active_players > 1:
+        while self.active_players > 1 and self.num_hands != self.target_num_hands:
             self.begin_round()
-            self.show_table_and_get_action()  # Pre-flop
+            self.show_round()  # Pre-flop
+            self.get_action()
 
-            if self.advance_round():  continue
-            self.show_table_and_get_action()  # Flop
+            self.advance_round()
+            self.show_round()  # Flop
+            self.get_action()
 
-            if self.advance_round():  continue
-            self.show_table_and_get_action()  # Turn
+            self.advance_round()
+            self.show_round()  # Turn
+            self.get_action()
 
-            if self.advance_round():  continue
-            self.show_table_and_get_action()  # River
+            self.advance_round()
+            self.show_round()  # River
+            self.get_action()
 
-            if self.advance_round(): continue
-            self.show_table()  # Showdown
-            self.get_action()  # TODO-debug
-
+            self.advance_round()
+            self.show_round(always=True)  # Showdown
             self.decide_winner()
 
-    def begin_round(self):
-        self.board = []
-        self.chips_per_pot = [0]
-        reshuffle()
-        self.betting_round = 0
-        self.num_hands += 1
-        if self.num_hands > 1:
-            self.dealer.button = False
-            self.dealer = self.dealer.next
-            self.dealer.button = True
+        raise RuntimeError('TODO: exited because target_num_hands reached or active_players == 1; declare the game winner here')
 
+    def begin_round(self):
+        self.num_hands += 1
+        self.chips_per_pot = [0]
+        self.board = []
+        self.betting_round = 0
+
+        if self.num_hands > 1:
+            self.advance_button()
+
+        reshuffle()
+        # ... and deal
         for player in self.players:
             player.in_hand = True if player.in_game else False
+            player.current_bet = 0 if player.in_hand else None
             player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
-            player.seen_cards = '       ' if not player.in_hand else '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+            player.seen_cards = '       ' if not player.in_hand else ('|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|')
 
-    def show_table_and_get_action(self):
-        self.show_table()
-        self.get_action()
+        self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
+        self.round_not_finished = True
 
-    def show_table(self):
+    def advance_button(self):
+        self.dealer.button = False
+        self.dealer = self.dealer.next
+        self.dealer.button = True
+
+    def show_round(self, always=False):
+        if not always and not SHOW_ROUNDS:
+            return
         print('                                        === ' + ROUND_NAME[self.betting_round] + ' ===      ')
         print('                          Board: ', end='')
         print(self.board)
@@ -475,88 +447,80 @@ class Game:
         print('         ' + '   '.join([player.seen_cards for player in self.players]) )
         print()
 
+    def execute(self, action):
+        assert isinstance(action, Action)
+
+        # TODO: skip action and jump to last_player_to_decide check if a player is all-in
+
+        decision = Action.UNDECIDED
+        match action:
+            case Action.CHECK_OR_FOLD:
+                decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.FOLD
+            case Action.CHECK_OR_CALL:
+                decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.CALL
+            case Action.RAISE_OR_CALL:
+                decision = Action.CALL if self.active_bet == self.bet_cap else Action.RAISE
+            case _:
+                raise ValueError(f'"action" argument provided to execute() ({action.name}) is disallowed')
+
+        match decision:
+            case Action.FOLD:
+                self.acting_player.in_hand = False
+                # TODO: transfer_current_bet_chips_into_appropriate_pot
+            case Action.CHECK:
+                pass
+            case Action.CALL:
+                # TODO: check that player has enough chips
+                self.acting_player.current_bet = self.active_bet
+            case Action.RAISE:
+                # TODO: check that player has enough chips
+                if not self.active_bet:  # Bet
+                    self.active_bet = self.bet_amt
+                else:  # Raise
+                    self.active_bet = min(self.active_bet + self.bet_amt, self.bet_cap)
+                self.last_player_to_decide = self.acting_player.prev
+                        ### me.current_bet = LIMIT_BET  # TODO
+                        ### me.chips -= LIMIT_BET
+
+        if self.acting_player == self.last_player_to_decide:
+            self.round_not_finished = False
+
+        self.acting_player = self.acting_player.next
+
     def get_action(self):
-        if self.betting_round == 4:  # TODO-debug
-            print()  # TODO-debug
-            print()  # TODO-debug
-            input()  # TODO-debug
-            return  # TODO-debug
+        assert self.betting_round < 4
 
-        final_player = self.dealer
-        current_player = self.dealer.next
+        self.acting_player = self.dealer.next if self.betting_round > 0 else (self.dealer.next.next.next if self.active_players > 2 else self.dealer)
+        self.last_player_to_decide = self.acting_player.prev
 
-        # TODO: this entire thing needs a revamp. If a betting action occurs, final_player and absolute_bet_right_now needs updating.
-        absolute_bet_right_now = LIMIT_BET  # TODO-debug
-        while True:
-            if current_player.npc:
-                action = current_player.strategy.get_preflop_action('AKs', Position.IGNORE)  # TODO
-                if action == Action.FOLD:
-                    if current_player.current_bet < absolute_bet_right_now:
-                        current_player.fold()  # TODO: belongs somewhere else?
-                    else:
-                        check()
-                elif action == Action.CALL:
-                    current_player.current_bet = absolute_bet_right_now
-                    current_player.chips -= absolute_bet_right_now  # FIXME
-                elif action == Action.RAISE:
-                    if absolute_bet_right_now < betting_cap:
-                        current_player.current_bet = LIMIT_BET + absolute_bet_right_now # TODO
-                        current_player.chips -= LIMIT_BET  # TODO: this should happen when the bet occurs
+        # TODO: fix betting, chip values
+        while self.round_not_finished:
+            if self.acting_player.npc:
+                action = Action.CHECK_OR_CALL
             else:
-                print('1 - fold   2 - check/call   3 - bet/raise   q - quit', end='\n\n')
-                #print('1 - fold   2 - check/call   3 - bet/raise   ~ - next hand (debug)', end='\n\n')
-                decision = ''
-                while len(decision) != 1 or decision not in '123q~':
-                    print(CURSOR_UP + ' '*len(decision) + '\r', end='')
-                    decision = input()
-                me = self.players[self.me]
-                match decision:
-                    case '1':
-                        me.in_hand = False
-                        me.seen_cards = '       '
-                        pass
-                    case '2':
-                        me.current_bet = LIMIT_BET  # TODO
-                        me.chips -= LIMIT_BET
-                        pass
-                    case '3':
-                        pass
-                    case 'q':
-                        import sys
-                        sys.exit(0)
-                    ### case '~':
-                    ###     for player in self.players:
-                    ###         player.in_hand = False
-                    ###     self.betting_round = -1  # TODO-hi: fix this, and this is also needed for when everyone folds early
-            if current_player == final_player:
-                break
-            current_player = current_player.next
-
-        self.chips_per_pot[-1] += sum([player.current_bet for player in self.players])
-        for player in self.players:
-            player.current_bet = 0
-
-        print(CURSOR_UP * 14)
+                hole_str = self.acting_player.hole_str()
+                action = preflop_strat.get_preflop_action(hole_str)
+            self.execute(action)
 
     def advance_round(self):
-        num_players = sum([1 if player.in_hand else 0 for player in self.players])
+        # TODO: active_players ... num_players = sum([1 if player.in_hand else 0 for player in self.players])
         self.betting_round += 1
         draw_card()  # burn card
         match self.betting_round:
             case 1:
-                min_bet, max_bet = LIMIT_BET, LIMIT_BET  # TODO: implement, also change to bet_amt and cap (for limit)?
+                self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
                 self.board.append( draw_card() )
                 self.board.append( draw_card() )
                 self.board.append( draw_card() )
             case 2:
-                min_bet, max_bet = 2 * LIMIT_BET, 2 * LIMIT_BET
+                self.bet_amt, self.bet_cap = 2 * LIMIT_BET, 8 * LIMIT_BET
                 self.board.append( draw_card() )
             case 3:
-                min_bet, max_bet = 2 * LIMIT_BET, 2 * LIMIT_BET
+                self.bet_amt, self.bet_cap = 2 * LIMIT_BET, 8 * LIMIT_BET
                 self.board.append( draw_card() )
             case 4:
                 for player in self.players:
-                    player.seen_cards = '       ' if not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+                    player.seen_cards = ' fold  ' if player.in_game and not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
 
     def decide_winner(self):
         # TODO: for each player in the outermost pot, test against neighbor until only players with "0" compare remain.
@@ -610,5 +574,6 @@ def card_name(card):
 
 
 if __name__ == '__main__':
-    game = Game(n=10, v=1)
+    preflop_strat = Strategy()
+    game = Game(players=10, hands=100)
     game.play()
