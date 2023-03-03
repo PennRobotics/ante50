@@ -33,7 +33,7 @@ from random import shuffle
 # Consts
 MAX_VER = 1
 LIMIT_BET = 2
-SHOW_ROUNDS = False
+SHOW_ROUNDS = True
 CURSOR_UP = '\033[1A' if True else ''
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
@@ -231,10 +231,8 @@ class Player:
         self.hole_cards = None
         self.seen_cards = '       '
         self.button = False
-        self.table_pos = None
-        self.cum_bet = None
+        self.cumul_bet = None
         self.current_bet = None
-        self.side_pot_idx = None
 
     def hole_str(self):
         assert isinstance(self.hole_cards, list)
@@ -392,19 +390,17 @@ class Game:
         assert isinstance(hands, int)
         assert players > 1 and players <= 10
 
+        self.winners = None
         self.betting_round = -1
         self.bet_amt = 0
         self.bet_cap = 0
         self.round_not_finished = None
         self.num_hands = 0
         self.target_num_hands = hands
-        self.active_players = players
-        self.active_bet = None
+        self.num_active_players = players
         self.acting_player = None
         self.last_player_to_decide = None
-        self.chips_per_pot = []
-        self.allin_players = []
-        self.cum_bet_per_round = []
+        self.high_bet_per_round = []
 
         # Create group of players with user-controlled player in the middle
         players -= 1
@@ -420,7 +416,6 @@ class Game:
             player.button = True if i == 1 else False
             player.name = f'Plyr {i:<2}' if player.npc else '  Bob  '
             player.chips = 100 * LIMIT_BET
-            player.table_pos = i
 
         # Circular linked list
         self.players.append(self.players[0])
@@ -448,10 +443,10 @@ class Game:
             playing_ahead.button = True
 
         player_to_remove.in_game = False
-        self.active_players -= 1
+        self.num_active_players -= 1
 
     def play(self):
-        while self.active_players > 1 and self.num_hands != self.target_num_hands:
+        while self.num_active_players > 1 and self.num_hands != self.target_num_hands:
             self.begin_round()
             self.show_round()  # Pre-flop
             self.get_action()
@@ -472,7 +467,7 @@ class Game:
             self.decide_winner()
             self.show_round(always=True)  # Showdown
 
-        #raise RuntimeError('TODO: exited because target_num_hands reached or active_players == 1; declare the game winner here')
+        #raise RuntimeError('TODO: exited because target_num_hands reached or num_active_players == 1; declare the game winner here')
 
 
     def update_bet(self, player, amount):
@@ -480,36 +475,12 @@ class Game:
         assert isinstance(amount, int)
         assert amount > 0
 
-        chips_avail = max(0, player.chips - self.cum_bet_per_round[-1])
+        chips_avail = max(0, player.chips - sum(self.high_bet_per_round))
         player.current_bet = chips_avail if chips_avail < amount else amount
-        player.cum_bet = self.cum_bet_per_round[-1] + player.current_bet
-
-        if chips_avail == 0 and player not in self.allin_players:
-            self.allin_players.append(player)
+        player.cumul_bet = sum(self.high_bet_per_round) + player.current_bet
 
     def put_bets_into_pot(self):
-        if self.active_bet == 0:
-            return
-
-        self.cum_bet_per_round.append(self.cum_bet_per_round[-1] + self.active_bet)
-
-        smallest_nonzero_bet = -1
-        largest_bet = max([player.current_bet for player in self.players])
-        these_bets = 0
-        while largest_bet != 0 and smallest_nonzero_bet != self.active_bet - these_bets:
-            smallest_nonzero_bet = min([player.current_bet for player in self.players if player.current_bet != 0])
-
-            for player in self.players:
-                this_bet = min(player.current_bet, smallest_nonzero_bet)
-                player.chips -= this_bet
-                self.chips_per_pot[-1] += this_bet
-                player.current_bet = max(player.current_bet - smallest_nonzero_bet, 0)
-
-            if smallest_nonzero_bet != self.active_bet:
-                self.chips_per_pot.append(0)
-
-            largest_bet = max([player.current_bet for player in self.players])
-
+        self.high_bet_per_round.append(self.active_bet)
         self.active_bet = 0
 
     def fold_player(self, player):
@@ -520,12 +491,9 @@ class Game:
 
     def begin_round(self):
         print([p.chips for p in self.players])  # TODO-debug
-        assert sum([p.chips for p in self.players]) == 2000
+        assert sum([p.chips for p in self.players]) == 2000  # TODO-debug
         self.round_not_finished = True
         self.num_hands += 1
-        self.chips_per_pot = [0]
-        self.allin_players = [None]
-        self.cum_bet_per_round = [0]
         self.board = []
         self.winners = None
         self.betting_round = 0
@@ -534,7 +502,7 @@ class Game:
         if self.num_hands > 1:
             self.advance_button()
 
-        if self.active_players > 2:
+        if self.num_active_players > 2:
             self.update_bet(self.dealer.next, self.bet_amt // 2)  # Small blind
             self.update_bet(self.dealer.next.next, self.bet_amt)  # Big blind
             self.acting_player = self.dealer.next.next.next
@@ -550,7 +518,7 @@ class Game:
         for player in self.players:
             # ... and deal
             player.in_hand = True if player.in_game else False
-            player.cum_bet = 0 if player.in_hand else None
+            player.cumul_bet = 0 if player.in_hand else None
             player.current_bet = 0
             if player.in_hand:
                 player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
@@ -594,7 +562,9 @@ class Game:
         assert isinstance(action, Action)
 
         # TODO: skip action and jump to last_player_to_decide check if a player is all-in
-        if self.acting_player not in self.allin_players:
+        chips_avail = max(0, self.acting_player.chips - sum(self.high_bet_per_round))
+        allin = False if chips_avail else True
+        if not allin:
 
             match action:
                 case Action.CHECK_OR_FOLD:
@@ -651,26 +621,31 @@ class Game:
             self.execute(action)
 
     def advance_round(self):
-        # TODO: active_players ... num_players = sum([1 if player.in_hand else 0 for player in self.players])
+        # TODO: num_active_players ... num_players = sum([1 if player.in_hand else 0 for player in self.players])
         self.put_bets_into_pot()
         self.betting_round += 1
         draw_card()  # burn card
         match self.betting_round:
-            case 1:
+            case Round.FLOP:
                 self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
                 self.board.append( draw_card() )
                 self.board.append( draw_card() )
                 self.board.append( draw_card() )
-            case 2:
+            case Round.TURN:
                 self.bet_amt, self.bet_cap = 2 * LIMIT_BET, 8 * LIMIT_BET
                 self.board.append( draw_card() )
-            case 3:
+            case Round.RIVER:
                 self.bet_amt, self.bet_cap = 2 * LIMIT_BET, 8 * LIMIT_BET
                 self.board.append( draw_card() )
-            case 4:
+            case Round.SHOWDOWN:
                 for player in self.players:
                     if player.in_game:
                         player.seen_cards = ' fold  ' if not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+
+        if self.betting_round == Round.SHOWDOWN:
+            return
+
+        self.round_not_finished = True
 
     def decide_winner(self):
         # TODO: for each player in the outermost pot, test against neighbor until only players with "0" compare remain.
@@ -697,7 +672,13 @@ class Game:
 
         has_won = True if self.me in [hand.owner for hand in showdown_pool] else False
 
-        chips_per_shove, total_odd_chips = divmod(self.chips_per_pot[-1], len(showdown_pool))
+        # TODO: determine chips_per_pot
+        print('CPP')
+        for p in self.players:
+            print(p.cumul_bet)
+        print(f'  : {sum(self.high_bet_per_round)}')
+
+        #chips_per_shove, total_odd_chips = divmod(chips_per_pot[-1], len(showdown_pool))
         for gets_odd, hand in enumerate(showdown_pool):
             hand.owner.chips += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
             if has_won:
@@ -716,7 +697,7 @@ class Game:
             bob_stats.winning_hand_type[my_hand.strength] += 1
         elif self.me.in_hand:
             bob_stats.hands_lost += 1
-            bob_stats.chips_lost[Round.SHOWDOWN] += self.me.cum_bet
+            bob_stats.chips_lost[Round.SHOWDOWN] += self.me.cumul_bet
             bob_stats.losing_hand_type[my_hand.strength] += 1
         else:  # folded
             bob_stats.num_folds[Round.PREFLOP] += 1
