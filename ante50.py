@@ -401,8 +401,8 @@ class Game:
             self.get_action()
 
             self.advance_round()
-            self.show_round(always=True)  # Showdown
             self.decide_winner()
+            self.show_round(always=True)  # Showdown
 
         raise RuntimeError('TODO: exited because target_num_hands reached or active_players == 1; declare the game winner here')
 
@@ -420,14 +420,15 @@ class Game:
             self.allin_players.append(player)
 
     def put_bets_into_pot(self):
+        if self.active_bet == 0:
+            return
+
         self.cum_bet_per_round.append(self.cum_bet_per_round[-1] + self.active_bet)
 
         smallest_nonzero_bet = -1
+        print(self.active_bet)
         while smallest_nonzero_bet != self.active_bet:
-            print('P:')
-            print([player.current_bet for player in self.players])
-            print([player.current_bet for player in self.players if player.current_bet != 0])
-            smallest_nonzero_bet = min([player.current_bet for player in self.players if player.current_bet != 0])  # TODO-debug
+            smallest_nonzero_bet = min([player.current_bet for player in self.players if player.current_bet != 0])
 
             for player in self.players:
                 player.chips -= min(player.current_bet, smallest_nonzero_bet)
