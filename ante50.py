@@ -31,7 +31,7 @@ from random import shuffle
 MAX_VER = 1
 LIMIT_BET = 2
 SHOW_ROUNDS = False
-STATS_ONLY = True
+STATS_ONLY = False
 CURSOR_UP = '\033[1A' if True else ''
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
@@ -207,11 +207,11 @@ class Strategy:
         i, j = (i, j) if suited else (j, i)
 
         match self.strength_table[i][j]:
-            case 8 | 7 | 6:
+            case 8 | 7 | 6 | 5:
                 return Action.RAISE_OR_CALL
-            case 5 | 4:
+            case 4:
                 return Action.CHECK_OR_CALL
-            case 3 | 2 | 1 | 0:
+            case 4 | 3 | 2 | 1 | 0:
                 return Action.CHECK_OR_FOLD
             case _:
                 raise RuntimeError('strength_table has an unexpected value')  # TODO: make this error better
@@ -447,7 +447,7 @@ class Game:
         self.num_active_players -= 1
 
     def play(self):
-        while self.num_active_players > 1 and self.num_hands != self.target_num_hands:
+        while self.num_active_players > 1 and self.num_hands != self.target_num_hands and self.me.in_game:
             self.begin_round()
             self.show_round()  # Pre-flop
             self.get_action()
