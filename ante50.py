@@ -146,7 +146,7 @@ class Stats:
         print(f'  Cash lost: {sum(self.chips_lost)}')
         print('-----')
         print(f'EV: {self.calculate_ev():.3f} big blinds / hand')
-        ### print(f'WINNING HAND HISTOGRAM: {self.winning_hand_type}')
+        print(f'WINNING HAND HISTOGRAM: {self.winning_hand_type}')
         ### print(f'LOSING HAND HISTOGRAM: {self.losing_hand_type}')
         ### 
         ### self.print_hole_str_cnt()
@@ -416,7 +416,7 @@ class Game:
             player.in_game = True
             player.button = True if i == 1 else False
             player.name = f'Plyr {i:<2}' if player.npc else '  Bob  '
-            player.chips = 100 * LIMIT_BET
+            player.chips = 6 * LIMIT_BET + 1
 
         # Circular linked list
         self.players.append(self.players[0])
@@ -495,7 +495,7 @@ class Game:
         self.acting_player.in_hand = False
 
     def begin_round(self):
-        assert sum([p.chips for p in self.players]) == 2000  # TODO-debug
+        ### assert sum([p.chips for p in self.players]) == 2000  # TODO-debug
         self.round_not_finished = True
         self.num_hands += 1
         self.board = []
@@ -751,9 +751,8 @@ def card_name(card):
 if __name__ == '__main__':
     preflop_strat = Strategy()
     bob_stats = Stats()
-    for _ in range(10):
-        game = Game(players=10, hands=10000)
-        game.play()
+    game = Game(players=4, hands=3000)
+    game.play()
     bob_stats.print_stats()
     ### print(f'# rounds: {game.num_hands}')  # TODO-debug: check that this matches bob_stats
 
