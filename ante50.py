@@ -16,7 +16,7 @@ from random import shuffle
 MAX_VER = 1
 LIMIT_BET = 2
 SHOW_ROUNDS = False
-STATS_ONLY = False
+STATS_ONLY = True
 CURSOR_UP = '\033[1A' if True else ''
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
@@ -156,7 +156,7 @@ class Stats:
         total_hands = self.total_hands()
         if total_hands == 0:
             return 0
-        profit_or_loss = sum(self.chips_won) - sum(self.chips_lost)
+        profit_or_loss = self.chips_won - self.chips_lost
         profit_or_loss_bb = profit_or_loss / LIMIT_BET
         return profit_or_loss_bb / total_hands
 
@@ -180,7 +180,7 @@ class Strategy:
                 [0,0,0,0,0,0,0,0,0,0,0,0,2]] # 2
                 # (off-suit)
 
-    def get_preflop_action(self, hole_str):
+    def get_preflop_action(self, hole_str, num_players):
         assert isinstance(hole_str, str)
         assert len(hole_str) == 2 or len(hole_str) == 3 and hole_str[2] == 's'
         assert all([v in VALUES for v in hole_str[0:2]])
@@ -191,12 +191,42 @@ class Strategy:
         j = 12 - VALUES.index(hole_str[1])
         i, j = (i, j) if suited else (j, i)
 
+        if num_players >= 7:
+            match self.strength_table[i][j]:
+                case 8:
+                    return Action.RAISE_OR_CALL
+                case 7 | 6:
+                    return Action.CHECK_OR_CALL
+                case 5 | 4 | 3 | 2 | 1 | 0:
+                    return Action.CHECK_OR_FOLD
+                case _:
+                    raise ValueError('Strategy.strength_table has an unexpected value')
+        if num_players >= 5:
+            match self.strength_table[i][j]:
+                case 8 | 7 | 6:
+                    return Action.RAISE_OR_CALL
+                case 5 | 4:
+                    return Action.CHECK_OR_CALL
+                case 3 | 2 | 1 | 0:
+                    return Action.CHECK_OR_FOLD
+                case _:
+                    raise ValueError('Strategy.strength_table has an unexpected value')
+        if num_players >= 3:
+            match self.strength_table[i][j]:
+                case 8 | 7 | 6 | 5:
+                    return Action.RAISE_OR_CALL
+                case 4 | 3:
+                    return Action.CHECK_OR_CALL
+                case 2 | 1 | 0:
+                    return Action.CHECK_OR_FOLD
+                case _:
+                    raise ValueError('Strategy.strength_table has an unexpected value')
         match self.strength_table[i][j]:
-            case 8 | 7 | 6:
+            case 8 | 7 | 6 | 5:
                 return Action.RAISE_OR_CALL
-            case 5 | 4:
+            case 4 | 3 | 2:
                 return Action.CHECK_OR_CALL
-            case 3 | 2 | 1 | 0:
+            case 1 | 0:
                 return Action.CHECK_OR_FOLD
             case _:
                 raise ValueError('Strategy.strength_table has an unexpected value')
@@ -207,7 +237,6 @@ class Player:
     def __init__(self, npc=True):
         assert isinstance(npc, bool)
         self.npc = npc
-        if not npc:  return
 
         self.name = '       '
         self.chips = 0
@@ -218,6 +247,8 @@ class Player:
         self.button = False
         self.cumul_bet = None
         self.current_bet = None
+        if not npc:
+            self.stats = Stats()
 
     def hole_str(self):
         assert isinstance(self.hole_cards, list)
@@ -401,7 +432,7 @@ class Game:
             player.in_game = True
             player.button = True if i == 1 else False
             player.name = f'Plyr {i:<2}' if player.npc else '  Bob  '
-            player.chips = 6 * LIMIT_BET + 1
+            player.chips = 100 * LIMIT_BET
 
         # Circular linked list
         self.players.append(self.players[0])
@@ -604,7 +635,7 @@ class Game:
                 action = Action.CHECK_OR_CALL
             else:
                 hole_str = self.acting_player.hole_str()
-                action = preflop_strat.get_preflop_action(hole_str)
+                action = preflop_strat.get_preflop_action(hole_str, self.num_active_players)
             self.execute(action)
 
     def advance_round(self):
@@ -642,6 +673,8 @@ class Game:
         incremental_pot_amount = [hi-lo for (hi, lo) in pairwise(pot_order_highest_first)]
 
         for player in self.players:
+            if not player.npc:
+                player.chips_at_round_start = player.chips
             player.chips -= player.cumul_bet
 
         for incr, chip_amt in zip(incremental_pot_amount, pot_order_highest_first):
@@ -675,6 +708,21 @@ class Game:
             elif player.chips < 0:
                 raise RuntimeError('A player is playing on credit. This is strictly forbidden!')
 
+        for player in self.players:
+            if player.npc:
+                continue
+            net_chips = player.chips - player.chips_at_round_start
+            del player.chips_at_round_start
+            if net_chips > 0:
+                player.stats.chips_won += net_chips
+                player.stats.hands_won += 1
+            if net_chips < 0:
+                player.stats.chips_lost -= net_chips
+                if self.me.in_hand:
+                    player.stats.hands_lost += 1
+                else:
+                    player.stats.num_folds[-1] += 1  # FIXME
+
 
 def reshuffle():
     global from_deck
@@ -705,6 +753,7 @@ def card_name(card):
 
 if __name__ == '__main__':
     preflop_strat = Strategy()
-    game = Game(players=4, hands=3000)
+    game = Game(players=8, hands=30000)
     game.play()
+    game.me.stats.print_stats()
 
