@@ -15,8 +15,8 @@ from random import shuffle
 # Consts
 MAX_VER = 1
 LIMIT_BET = 2
-SHOW_ROUNDS = False
-STATS_ONLY = True
+SHOW_ROUNDS = True
+STATS_ONLY = False
 CURSOR_UP = '\033[1A' if True else ''
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
@@ -47,12 +47,6 @@ class Round(IntEnum):
     TURN = 2
     RIVER = 3
     SHOWDOWN = 4
-
-ROUND_NAME = { Round.PREFLOP: 'Pre-flop',
-               Round.FLOP: 'Flop',
-               Round.TURN: 'Turn',
-               Round.RIVER: 'River',
-               Round.SHOWDOWN: 'Showdown' }
 
 class HandRank(IntEnum):
     HIGH_CARD = 0
@@ -407,7 +401,7 @@ class Game:
         assert players > 1 and players <= 10
 
         self.winners = None
-        self.betting_round = -1
+        self.betting_round = None
         self.bet_amt = 0
         self.bet_cap = 0
         self.round_not_finished = None
@@ -512,7 +506,7 @@ class Game:
         self.num_hands += 1
         self.board = []
         self.winners = None
-        self.betting_round = 0
+        self.betting_round = Round.PREFLOP
         self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
 
         for player in self.players:
@@ -555,7 +549,7 @@ class Game:
             return
         if STATS_ONLY:
             return
-        print('                                        === ' + ROUND_NAME[self.betting_round] + ' ===      ')
+        print(f'                                        === {self.betting_round.name.capitalize()} ===      ')
         print('                          Board: ', end='')
         print(self.board)
         print()
@@ -565,7 +559,7 @@ class Game:
         print()
         print('         ' + '   '.join([player.seen_cards for player in self.players]) )
         print()
-        if self.betting_round == 4:
+        if self.betting_round == Round.SHOWDOWN:
             winner_str = ' and '.join([w.strip() for w in self.winners[0]]) + ' with '
             if self.winners[1][0][-1] != 's' or self.winners[1][0][0] == 'p':
                 if self.winners[1][0][0] == 'a' and self.winners[1][0][3] != 's' or self.winners[1][0][0] == 'e' and self.winners[1][0][5] != 's':
@@ -582,6 +576,7 @@ class Game:
         if STATS_ONLY:
             return
         print('Action ->   ' + '         '.join([str(p.current_bet) for p in self.players]))
+        print()
 
     def execute(self, action):
         assert isinstance(action, Action)
@@ -623,9 +618,9 @@ class Game:
         self.acting_player = self.acting_player.next
 
     def get_action(self):
-        assert self.betting_round < 4
+        assert self.betting_round < Round.SHOWDOWN
 
-        if self.betting_round > 0:
+        if self.betting_round > Round.PREFLOP:
             self.acting_player = self.dealer.next
 
         self.last_player_to_decide = self.acting_player.prev
@@ -640,7 +635,7 @@ class Game:
 
     def advance_round(self):
         self.put_bets_into_pot()
-        self.betting_round += 1
+        self.betting_round = Round(self.betting_round + 1)
         if self.betting_round < Round.SHOWDOWN:
             draw_card()  # burn card
         match self.betting_round:
@@ -753,7 +748,7 @@ def card_name(card):
 
 if __name__ == '__main__':
     preflop_strat = Strategy()
-    game = Game(players=8, hands=30000)
+    game = Game(players=7, hands=3)
     game.play()
     game.me.stats.print_stats()
 
