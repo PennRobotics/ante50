@@ -1,9 +1,6 @@
 # TODO
 # ====
 # Close up existing TODO tags
-# Side pots (and odd chips) correctly distributed
-# Provide modifiable stats as a JSON
-# Decision maker (strategy) is imported and called
 # Function to sort by card value (instead of calling VALUES[sorted(VALUES.index(v))])
 
 # TODO: put docstrings for each major code block:
@@ -170,9 +167,11 @@ class Stats:
 
     def calculate_ev(self):
         ''' Big blinds per hand '''
+        total_hands = self.total_hands()
+        if total_hands == 0:
+            return 0
         profit_or_loss = sum(self.chips_won) - sum(self.chips_lost)
         profit_or_loss_bb = profit_or_loss / LIMIT_BET
-        total_hands = self.total_hands()
         return profit_or_loss_bb / total_hands
 
 
@@ -663,17 +662,19 @@ class Game:
             player.chips -= player.cumul_bet
 
         for incr, chip_amt in zip(incremental_pot_amount, pot_order_highest_first):
-            showdown_pool = [Hand(set(self.board + player.hole_cards), owner=player) for player in self.players if player.cumul_bet >= chip_amt]
+            showdown_pool = [Hand(set(self.board + player.hole_cards), owner=player) for player in self.players if player.cumul_bet >= chip_amt and player.in_hand]
             pot_amount = sum([incr for player in self.players if player.cumul_bet >= chip_amt])
 
             i = 0
             while i < len(showdown_pool) - 1:
                 outcome = showdown_pool[i].compare(showdown_pool[i+1])
                 if outcome > 0:
-                    showdown_pool.pop(i+1)
+                    hd = showdown_pool.pop(i+1)
+                    hd.owner.in_hand = False if hd.owner != self.me else True  # TODO-debug: left in for stats
                 elif outcome < 0:
                     for _ in range(i+1):
-                        showdown_pool.pop(0)
+                        hd = showdown_pool.pop(0)
+                        hd.owner.in_hand = False if hd.owner != self.me else True  # TODO-debug: left in for stats
                     i = 0
                 else:
                     i += 1
@@ -682,10 +683,29 @@ class Game:
 
             for gets_odd, hand in enumerate(showdown_pool):
                 hand.owner.chips += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
-                ### if has_won:
-                    ### bob_stats.chips_won[Round.SHOWDOWN] += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
+                if hand.owner == self.me:
+                    bob_stats.chips_won[Round.SHOWDOWN] += chips_per_shove + (1 if gets_odd < total_odd_chips else 0) - incr
+
 
         self.winners = [[hand.owner.name for hand in showdown_pool], [str(hand) for hand in showdown_pool],]
+
+        # TODO-debug
+        my_hand = Hand(set(self.board + self.me.hole_cards))
+
+        # TODO-debug
+        # TODO: fix stats for winning after opponents fold
+        has_won = True if self.me in [hand.owner for hand in showdown_pool] else False
+        if has_won:
+            bob_stats.num_calls = [n+1 for n in bob_stats.num_calls]
+            bob_stats.hands_won[Round.SHOWDOWN] += 1
+            bob_stats.winning_hand_type[my_hand.strength] += 1
+        elif self.me.in_hand:
+            bob_stats.hands_lost += 1
+            bob_stats.chips_lost[Round.SHOWDOWN] += self.me.cumul_bet
+            bob_stats.losing_hand_type[my_hand.strength] += 1
+        else:  # folded
+            bob_stats.num_folds[Round.PREFLOP] += 1
+        bob_stats.hole_str_cnt[self.me.hole_str()] += 1
 
         for player in self.players:
             player.cumul_bet = 0  # Added so showdown appears correctly
@@ -693,30 +713,6 @@ class Game:
                 self.remove_player(player)
             elif player.chips < 0:
                 raise RuntimeError('A player is playing on credit. This is strictly forbidden!')
-
-        ### print('!')
-
-        # TODO: fix for side pots
-        ### my_hand = [hand for hand in showdown_pool if hand.owner == self.me]
-        ### if my_hand != []:
-            ### my_hand = my_hand[0]
-
-        ### has_won = True if self.me in [hand.owner for hand in showdown_pool] else False
-
-        # TODO: determine chips_per_pot
-
-        # TODO-debug
-        ### if has_won:
-        ###     bob_stats.num_calls = [n+1 for n in bob_stats.num_calls]
-        ###     bob_stats.hands_won[Round.SHOWDOWN] += 1
-        ###     bob_stats.winning_hand_type[my_hand.strength] += 1
-        ### elif self.me.in_hand:
-        ###     bob_stats.hands_lost += 1
-        ###     bob_stats.chips_lost[Round.SHOWDOWN] += self.me.cumul_bet
-        ###     bob_stats.losing_hand_type[my_hand.strength] += 1
-        ### else:  # folded
-        ###     bob_stats.num_folds[Round.PREFLOP] += 1
-        ### bob_stats.hole_str_cnt[self.me.hole_str()] += 1
 
 
 def reshuffle():
@@ -751,5 +747,6 @@ if __name__ == '__main__':
     bob_stats = Stats()
     game = Game(players=10, hands=10000)
     game.play()
-    ### bob_stats.print_stats()
+    bob_stats.print_stats()
+    print(f'# rounds: {game.num_hands}')  # TODO-debug: check that this matches bob_stats
 
