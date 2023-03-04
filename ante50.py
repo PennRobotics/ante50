@@ -416,7 +416,7 @@ class Game:
             player.in_game = True
             player.button = True if i == 1 else False
             player.name = f'Plyr {i:<2}' if player.npc else '  Bob  '
-            player.chips = 100 * LIMIT_BET
+            player.chips = 2*i+8 #TODO-debug:100 * LIMIT_BET
 
         # Circular linked list
         self.players.append(self.players[0])
@@ -485,7 +485,6 @@ class Game:
 
     def put_bets_into_pot(self):
         self.high_bet_per_round.append(self.high_bet)
-        print(self.high_bet_per_round)  # TODO-debug
         self.high_bet = 0
         for player in self.players:
             player.current_bet = 0
@@ -497,7 +496,7 @@ class Game:
 
     def begin_round(self):
         print([p.chips for p in self.players])  # TODO-debug
-        assert sum([p.chips for p in self.players]) == 2000  # TODO-debug
+        ### assert sum([p.chips for p in self.players]) == 190#2000  # TODO-debug
         self.round_not_finished = True
         self.num_hands += 1
         self.board = []
@@ -518,12 +517,13 @@ class Game:
         self.acting_player = self.acting_player.next
 
         self.high_bet = self.bet_amt  # needed for when big blind does not have enough chips
+        self.high_bet_per_round = []
 
         reshuffle()
         for player in self.players:
             # ... and deal
             player.in_hand = True if player.in_game else False
-            player.cumul_bet = 0 if player.in_hand else None
+            player.cumul_bet = 0
             player.current_bet = 0
             if player.in_hand:
                 player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
@@ -544,6 +544,12 @@ class Game:
         print('                          Board: ', end='')
         print(self.board)
         print()
+        print('         ' + '   '.join(['  (D)  ' if player.button else '       ' for player in self.players]) )
+        print('         ' + '   '.join([player.name for player in self.players]) )
+        print('         ' + '   '.join([f'{player.chips-player.cumul_bet:^7}' for player in self.players]) )
+        print()
+        print('         ' + '   '.join([player.seen_cards for player in self.players]) )
+        print()
         if self.betting_round == 4:
             winner_str = ' and '.join([w.strip() for w in self.winners[0]]) + ' with '
             if self.winners[1][0][-1] != 's' or self.winners[1][0][0] == 'p':
@@ -553,12 +559,6 @@ class Game:
                     winner_str += 'a '
             winner_str += self.winners[1][0]
             print(f'Winner: {winner_str}')
-        print()
-        print('         ' + '   '.join(['  (D)  ' if player.button else '       ' for player in self.players]) )
-        print('         ' + '   '.join([player.name for player in self.players]) )
-        print('         ' + '   '.join([f'{player.chips:^7}' for player in self.players]) )
-        print()
-        print('         ' + '   '.join([player.seen_cards for player in self.players]) )
         print()
 
     def show_action(self, always=False):
@@ -655,57 +655,71 @@ class Game:
         # TODO: for each player in the outermost pot, test against neighbor until only players with "0" compare remain.
         #   Then, split the pot between these players. Open the next pot and repeat until all cash is settled.
 
-        # TODO: fix for side pots
-        showdown_pool = [Hand(set(self.board + player.hole_cards), owner=player) for player in self.players if player.in_hand]
-        my_hand = [hand for hand in showdown_pool if hand.owner == self.me]
-        if my_hand != []:
-            my_hand = my_hand[0]
-        i = 0
-        while i < len(showdown_pool) - 1:
-            outcome = showdown_pool[i].compare(showdown_pool[i+1])
-            if outcome > 0:
-                showdown_pool.pop(i+1)
-            elif outcome < 0:
-                for _ in range(i+1):
-                    showdown_pool.pop(0)
-                i = 0
-            else:
-                i += 1
+        pot_order_highest_first = sorted(set([p.cumul_bet for p in self.players]), reverse=True)
+        if pot_order_highest_first[-1] != 0:
+            pot_order_highest_first.append(0)
+        incremental_pot_amount = [hi-lo for (hi, lo) in pairwise(pot_order_highest_first)]
+
+        for player in self.players:
+            player.chips -= player.cumul_bet
+
+        for incr, chip_amt in zip(incremental_pot_amount, pot_order_highest_first):
+            showdown_pool = [Hand(set(self.board + player.hole_cards), owner=player) for player in self.players if player.cumul_bet >= chip_amt]
+            pot_amount = sum([incr for player in self.players if player.cumul_bet >= chip_amt])
+
+            i = 0
+            while i < len(showdown_pool) - 1:
+                outcome = showdown_pool[i].compare(showdown_pool[i+1])
+                if outcome > 0:
+                    showdown_pool.pop(i+1)
+                elif outcome < 0:
+                    for _ in range(i+1):
+                        showdown_pool.pop(0)
+                    i = 0
+                else:
+                    i += 1
+
+            chips_per_shove, total_odd_chips = divmod(pot_amount, len(showdown_pool))
+
+            for gets_odd, hand in enumerate(showdown_pool):
+                hand.owner.chips += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
+                ### if has_won:
+                    ### bob_stats.chips_won[Round.SHOWDOWN] += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
+
+            for player in self.players:
+                if player.in_game and player.chips == 0:
+                    self.remove_player(player)
+                elif player.chips < 0:
+                    raise RuntimeError('A player is playing on credit. This is strictly forbidden!')
 
         self.winners = [[hand.owner.name for hand in showdown_pool], [str(hand) for hand in showdown_pool],]
 
-        has_won = True if self.me in [hand.owner for hand in showdown_pool] else False
+        for player in self.players:
+            player.cumul_bet = 0  # Added so showdown appears correctly
+
+        ### print('!')
+
+        # TODO: fix for side pots
+        ### my_hand = [hand for hand in showdown_pool if hand.owner == self.me]
+        ### if my_hand != []:
+            ### my_hand = my_hand[0]
+
+        ### has_won = True if self.me in [hand.owner for hand in showdown_pool] else False
 
         # TODO: determine chips_per_pot
-        print('CPP')
-        for p in self.players:
-            print(p.cumul_bet)
-        print(f'  : {sum(self.high_bet_per_round)}')
-
-        #chips_per_shove, total_odd_chips = divmod(chips_per_pot[-1], len(showdown_pool))
-        for gets_odd, hand in enumerate(showdown_pool):
-            hand.owner.chips += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
-            if has_won:
-                bob_stats.chips_won[Round.SHOWDOWN] += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
-
-        for player in self.players:
-            if player.in_game and player.chips == 0:
-                self.remove_player(player)
-            elif player.chips < 0:
-                raise RuntimeError('A player is playing on credit. This is strictly forbidden!')
 
         # TODO-debug
-        if has_won:
-            bob_stats.num_calls = [n+1 for n in bob_stats.num_calls]
-            bob_stats.hands_won[Round.SHOWDOWN] += 1
-            bob_stats.winning_hand_type[my_hand.strength] += 1
-        elif self.me.in_hand:
-            bob_stats.hands_lost += 1
-            bob_stats.chips_lost[Round.SHOWDOWN] += self.me.cumul_bet
-            bob_stats.losing_hand_type[my_hand.strength] += 1
-        else:  # folded
-            bob_stats.num_folds[Round.PREFLOP] += 1
-        bob_stats.hole_str_cnt[self.me.hole_str()] += 1
+        ### if has_won:
+        ###     bob_stats.num_calls = [n+1 for n in bob_stats.num_calls]
+        ###     bob_stats.hands_won[Round.SHOWDOWN] += 1
+        ###     bob_stats.winning_hand_type[my_hand.strength] += 1
+        ### elif self.me.in_hand:
+        ###     bob_stats.hands_lost += 1
+        ###     bob_stats.chips_lost[Round.SHOWDOWN] += self.me.cumul_bet
+        ###     bob_stats.losing_hand_type[my_hand.strength] += 1
+        ### else:  # folded
+        ###     bob_stats.num_folds[Round.PREFLOP] += 1
+        ### bob_stats.hole_str_cnt[self.me.hole_str()] += 1
 
 
 def reshuffle():
@@ -738,7 +752,7 @@ def card_name(card):
 if __name__ == '__main__':
     preflop_strat = Strategy()
     bob_stats = Stats()
-    game = Game(players=10, hands=10000)
+    game = Game(players=10, hands=1)
     game.play()
-    bob_stats.print_stats()
+    ### bob_stats.print_stats()
 
