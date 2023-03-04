@@ -2,6 +2,29 @@ ante50
 ======
 > _optim branch_
 
+## Measurements
+
+On the _cs50 branch_, a very simple pre-flop strategy against 9 calling stations has the following performance
+
+```bash
+ $  time python ante50.py
+
+Hands played: 198263
+  Hands won: 15310 (15310 at showdown)
+  Hands lost: 19926
+  Hands folded: 163027
+Raises: 84994
+Balance: 173596
+  Cash won: 349386
+  Cash lost: 175790
+-----
+EV: 0.438 big blinds / hand
+
+python ante50.py  24.22s user 0.00s system 99% cpu 24.270 total
+```
+
+For a detailed view of a profiling trace, see [cprofile.md](cprofile.md)
+
 ## Branches
 
 **main**
