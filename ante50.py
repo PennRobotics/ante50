@@ -685,16 +685,14 @@ class Game:
                 ### if has_won:
                     ### bob_stats.chips_won[Round.SHOWDOWN] += chips_per_shove + (1 if gets_odd < total_odd_chips else 0)
 
-            for player in self.players:
-                if player.in_game and player.chips == 0:
-                    self.remove_player(player)
-                elif player.chips < 0:
-                    raise RuntimeError('A player is playing on credit. This is strictly forbidden!')
-
         self.winners = [[hand.owner.name for hand in showdown_pool], [str(hand) for hand in showdown_pool],]
 
         for player in self.players:
             player.cumul_bet = 0  # Added so showdown appears correctly
+            if player.in_game and player.chips == 0:
+                self.remove_player(player)
+            elif player.chips < 0:
+                raise RuntimeError('A player is playing on credit. This is strictly forbidden!')
 
         ### print('!')
 
