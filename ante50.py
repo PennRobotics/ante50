@@ -401,6 +401,7 @@ class Game:
         self.acting_player = None
         self.last_player_to_decide = None
         self.high_bet_per_round = []
+        self.high_bet = None
 
         # Create group of players with user-controlled player in the middle
         players -= 1
@@ -450,18 +451,22 @@ class Game:
             self.begin_round()
             self.show_round()  # Pre-flop
             self.get_action()
+            self.show_action()
 
             self.advance_round()
             self.show_round()  # Flop
             self.get_action()
+            self.show_action()
 
             self.advance_round()
             self.show_round()  # Turn
             self.get_action()
+            self.show_action()
 
             self.advance_round()
             self.show_round()  # River
             self.get_action()
+            self.show_action()
 
             self.advance_round()
             self.decide_winner()
@@ -470,24 +475,25 @@ class Game:
         #raise RuntimeError('TODO: exited because target_num_hands reached or num_active_players == 1; declare the game winner here')
 
 
-    def update_bet(self, player, amount):
-        assert isinstance(player, Player)
+    def update_bet(self, amount):
         assert isinstance(amount, int)
         assert amount > 0
 
-        chips_avail = max(0, player.chips - sum(self.high_bet_per_round))
-        player.current_bet = chips_avail if chips_avail < amount else amount
-        player.cumul_bet = sum(self.high_bet_per_round) + player.current_bet
+        chips_avail = max(0, self.acting_player.chips - sum(self.high_bet_per_round))
+        self.acting_player.current_bet = chips_avail if chips_avail < amount else amount
+        self.acting_player.cumul_bet = sum(self.high_bet_per_round) + self.acting_player.current_bet
 
     def put_bets_into_pot(self):
-        self.high_bet_per_round.append(self.active_bet)
-        self.active_bet = 0
+        self.high_bet_per_round.append(self.high_bet)
+        print(self.high_bet_per_round)  # TODO-debug
+        self.high_bet = 0
+        for player in self.players:
+            player.current_bet = 0
 
-    def fold_player(self, player):
-        assert isinstance(player, Player)
-        assert player.in_hand == True
-
-        player.in_hand = False
+    def fold_player(self):
+        assert self.acting_player.in_hand == True
+        self.acting_player.seen_cards = ' fold  '
+        self.acting_player.in_hand = False
 
     def begin_round(self):
         print([p.chips for p in self.players])  # TODO-debug
@@ -503,16 +509,15 @@ class Game:
             self.advance_button()
 
         if self.num_active_players > 2:
-            self.update_bet(self.dealer.next, self.bet_amt // 2)  # Small blind
-            self.update_bet(self.dealer.next.next, self.bet_amt)  # Big blind
-            self.acting_player = self.dealer.next.next.next
-            self.active_bet = self.bet_amt  # needed for when big blind does not have enough chips
+            self.acting_player = self.dealer.next
         else:
-            self.update_bet(self.dealer, self.bet_amt // 2)  # Small blind
-            self.update_bet(self.dealer.next, self.bet_amt)  # Big blind
             self.acting_player = self.dealer
+        self.update_bet(self.bet_amt // 2)  # Small blind
+        self.acting_player = self.acting_player.next
+        self.update_bet(self.bet_amt)  # Big blind
+        self.acting_player = self.acting_player.next
 
-        self.active_bet = self.bet_amt
+        self.high_bet = self.bet_amt  # needed for when big blind does not have enough chips
 
         reshuffle()
         for player in self.players:
@@ -548,8 +553,6 @@ class Game:
                     winner_str += 'a '
             winner_str += self.winners[1][0]
             print(f'Winner: {winner_str}')
-        else:
-            print('Action ->')
         print()
         print('         ' + '   '.join(['  (D)  ' if player.button else '       ' for player in self.players]) )
         print('         ' + '   '.join([player.name for player in self.players]) )
@@ -557,6 +560,11 @@ class Game:
         print()
         print('         ' + '   '.join([player.seen_cards for player in self.players]) )
         print()
+
+    def show_action(self, always=False):
+        if not always and not SHOW_ROUNDS:
+            return
+        print('Action ->   ' + '         '.join([str(p.current_bet) for p in self.players]))
 
     def execute(self, action):
         assert isinstance(action, Action)
@@ -568,34 +576,29 @@ class Game:
 
             match action:
                 case Action.CHECK_OR_FOLD:
-                    decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.FOLD
+                    decision = Action.CHECK if self.high_bet == self.acting_player.current_bet else Action.FOLD
                 case Action.CHECK_OR_CALL:
-                    decision = Action.CHECK if self.active_bet == self.acting_player.current_bet else Action.CALL
+                    decision = Action.CHECK if self.high_bet == self.acting_player.current_bet else Action.CALL
                 case Action.RAISE_OR_CALL:
-                    decision = Action.CALL if self.active_bet == self.bet_cap else Action.RAISE
+                    decision = Action.CALL if self.high_bet == self.bet_cap else Action.RAISE
                 case _:
                     raise ValueError(f'"action" argument provided to execute() ({action.name}) is disallowed')
 
             match decision:
                 case Action.FOLD:
-                    self.acting_player.in_hand = False
-                    # TODO: transfer_current_bet_chips_into_appropriate_pot
+                    self.fold_player()
                 case Action.CHECK:
                     pass
                 case Action.CALL:
-                    # TODO: check that player has enough chips
-                    self.acting_player.current_bet = min(self.acting_player.chips, self.active_bet)
-                    if self.acting_player.current_bet < self.active_bet:
-                        self.allin_players.append(self.acting_player)
+                    if self.high_bet > 0:
+                        self.update_bet(self.high_bet)
                 case Action.RAISE:
-                    # TODO: check that player has enough chips
-                    if not self.active_bet:  # Bet
-                        self.active_bet = self.bet_amt
+                    if not self.high_bet:  # Bet
+                        self.high_bet = min(chips_avail, self.bet_amt)
                     else:  # Raise
-                        self.active_bet = min(self.active_bet + self.bet_amt, self.bet_cap)
+                        self.high_bet = min([chips_avail, self.bet_cap, self.high_bet + self.bet_amt])
+                    self.update_bet(self.high_bet)
                     self.last_player_to_decide = self.acting_player.prev
-                            ### me.current_bet = LIMIT_BET  # TODO
-                            ### me.chips -= LIMIT_BET
 
         if self.acting_player == self.last_player_to_decide:
             self.round_not_finished = False
@@ -624,7 +627,8 @@ class Game:
         # TODO: num_active_players ... num_players = sum([1 if player.in_hand else 0 for player in self.players])
         self.put_bets_into_pot()
         self.betting_round += 1
-        draw_card()  # burn card
+        if self.betting_round < Round.SHOWDOWN:
+            draw_card()  # burn card
         match self.betting_round:
             case Round.FLOP:
                 self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
