@@ -1,23 +1,8 @@
 # TODO
 # ====
-# Close up existing TODO tags
 # Function to sort by card value (instead of calling VALUES[sorted(VALUES.index(v))])
-
-# TODO: put docstrings for each major code block:
-# Strategy class
-# - currently, only implements position-agnostic pre-flop hand strength for a full table
-# Stats
-# - win/loss hand count
-# - win/loss cash amount
-# - per round: number of folds, calls, raises
-# Player class
-# - avail cash
-# Game class
-# - limit stakes for now
-# - players
-# - handle each round
-# - get input
-
+# Fix Stats class
+# Docstrings
 
 
 # Imports
@@ -207,14 +192,14 @@ class Strategy:
         i, j = (i, j) if suited else (j, i)
 
         match self.strength_table[i][j]:
-            case 8 | 7 | 6 | 5:
+            case 8 | 7 | 6:
                 return Action.RAISE_OR_CALL
-            case 4:
+            case 5 | 4:
                 return Action.CHECK_OR_CALL
-            case 4 | 3 | 2 | 1 | 0:
+            case 3 | 2 | 1 | 0:
                 return Action.CHECK_OR_FOLD
             case _:
-                raise RuntimeError('strength_table has an unexpected value')  # TODO: make this error better
+                raise ValueError('Strategy.strength_table has an unexpected value')
 
 
 class Player:
@@ -271,7 +256,7 @@ class Hand:
             self.strength = HandRank.FLUSH
             self.highest_cards = [VALUE_NAME[VALUES[max([VALUES.index(value) for value, suit in hand_set if suit == common_suit])]]]
             value, suit = zip(*hand_set)
-            sorted_suit_idxs = sorted([VALUES.index(value) for value, suit in hand_set if suit == common_suit])  # TODO: probably use reverse=True
+            sorted_suit_idxs = sorted([VALUES.index(value) for value, suit in hand_set if suit == common_suit])
             self.rank = list(reversed(sorted_suit_idxs))[0:5]
 
         # Check for repeated values (pair, two pair, three of a kind, full house, four of a kind)
@@ -570,11 +555,10 @@ class Game:
     def execute(self, action):
         assert isinstance(action, Action)
 
-        # TODO: skip action and jump to last_player_to_decide check if a player is all-in
         chips_avail = max(0, self.acting_player.chips - sum(self.high_bet_per_round))
         allin = False if chips_avail else True
-        if not allin:
 
+        if not allin:
             match action:
                 case Action.CHECK_OR_FOLD:
                     decision = Action.CHECK if self.high_bet == self.acting_player.current_bet else Action.FOLD
@@ -616,7 +600,6 @@ class Game:
 
         self.last_player_to_decide = self.acting_player.prev
 
-        # TODO: fix betting, chip values
         while self.round_not_finished:
             if self.acting_player.npc:
                 action = Action.CHECK_OR_CALL
@@ -626,7 +609,6 @@ class Game:
             self.execute(action)
 
     def advance_round(self):
-        # TODO: num_active_players ... num_players = sum([1 if player.in_hand else 0 for player in self.players])
         self.put_bets_into_pot()
         self.betting_round += 1
         if self.betting_round < Round.SHOWDOWN:
@@ -655,9 +637,6 @@ class Game:
         self.round_not_finished = True
 
     def decide_winner(self):
-        # TODO: for each player in the outermost pot, test against neighbor until only players with "0" compare remain.
-        #   Then, split the pot between these players. Open the next pot and repeat until all cash is settled.
-
         pot_order_highest_first = sorted(set([p.cumul_bet for p in self.players]), reverse=True)
         if pot_order_highest_first[-1] != 0:
             pot_order_highest_first.append(0)
@@ -727,9 +706,6 @@ def card_name(card):
 
 if __name__ == '__main__':
     preflop_strat = Strategy()
-    bob_stats = Stats()
     game = Game(players=4, hands=3000)
     game.play()
-    bob_stats.print_stats()
-    ### print(f'# rounds: {game.num_hands}')  # TODO-debug: check that this matches bob_stats
 
