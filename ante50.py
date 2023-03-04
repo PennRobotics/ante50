@@ -33,7 +33,7 @@ from random import shuffle
 # Consts
 MAX_VER = 1
 LIMIT_BET = 2
-SHOW_ROUNDS = True
+SHOW_ROUNDS = False
 CURSOR_UP = '\033[1A' if True else ''
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
@@ -416,7 +416,7 @@ class Game:
             player.in_game = True
             player.button = True if i == 1 else False
             player.name = f'Plyr {i:<2}' if player.npc else '  Bob  '
-            player.chips = 2*i+8 #TODO-debug:100 * LIMIT_BET
+            player.chips = 100 * LIMIT_BET
 
         # Circular linked list
         self.players.append(self.players[0])
@@ -495,8 +495,7 @@ class Game:
         self.acting_player.in_hand = False
 
     def begin_round(self):
-        print([p.chips for p in self.players])  # TODO-debug
-        ### assert sum([p.chips for p in self.players]) == 190#2000  # TODO-debug
+        assert sum([p.chips for p in self.players]) == 2000  # TODO-debug
         self.round_not_finished = True
         self.num_hands += 1
         self.board = []
@@ -752,7 +751,7 @@ def card_name(card):
 if __name__ == '__main__':
     preflop_strat = Strategy()
     bob_stats = Stats()
-    game = Game(players=10, hands=1)
+    game = Game(players=10, hands=10000)
     game.play()
     ### bob_stats.print_stats()
 
