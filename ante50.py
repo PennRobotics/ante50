@@ -31,6 +31,7 @@ from random import shuffle
 MAX_VER = 1
 LIMIT_BET = 2
 SHOW_ROUNDS = False
+STATS_ONLY = True
 CURSOR_UP = '\033[1A' if True else ''
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
@@ -145,10 +146,10 @@ class Stats:
         print(f'  Cash lost: {sum(self.chips_lost)}')
         print('-----')
         print(f'EV: {self.calculate_ev():.3f} big blinds / hand')
-        print(f'WINNING HAND HISTOGRAM: {self.winning_hand_type}')
-        print(f'LOSING HAND HISTOGRAM: {self.losing_hand_type}')
-
-        self.print_hole_str_cnt()
+        ### print(f'WINNING HAND HISTOGRAM: {self.winning_hand_type}')
+        ### print(f'LOSING HAND HISTOGRAM: {self.losing_hand_type}')
+        ### 
+        ### self.print_hole_str_cnt()
 
     def print_hole_str_cnt(self):
         for j, x in enumerate(reversed(VALUES)):
@@ -538,6 +539,8 @@ class Game:
     def show_round(self, always=False):
         if not always and not SHOW_ROUNDS:
             return
+        if STATS_ONLY:
+            return
         print('                                        === ' + ROUND_NAME[self.betting_round] + ' ===      ')
         print('                          Board: ', end='')
         print(self.board)
@@ -561,6 +564,8 @@ class Game:
 
     def show_action(self, always=False):
         if not always and not SHOW_ROUNDS:
+            return
+        if STATS_ONLY:
             return
         print('Action ->   ' + '         '.join([str(p.current_bet) for p in self.players]))
 
@@ -591,6 +596,7 @@ class Game:
                     if self.high_bet > 0:
                         self.update_bet(self.high_bet)
                 case Action.RAISE:
+                    bob_stats.num_raises[self.betting_round] += 1
                     if not self.high_bet:  # Bet
                         self.high_bet = min(chips_avail, self.bet_amt)
                     else:  # Raise
@@ -745,8 +751,9 @@ def card_name(card):
 if __name__ == '__main__':
     preflop_strat = Strategy()
     bob_stats = Stats()
-    game = Game(players=10, hands=10000)
-    game.play()
+    for _ in range(10):
+        game = Game(players=10, hands=10000)
+        game.play()
     bob_stats.print_stats()
-    print(f'# rounds: {game.num_hands}')  # TODO-debug: check that this matches bob_stats
+    ### print(f'# rounds: {game.num_hands}')  # TODO-debug: check that this matches bob_stats
 
