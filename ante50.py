@@ -578,7 +578,6 @@ class Game:
                     if self.high_bet > 0:
                         self.update_bet(self.high_bet)
                 case Action.RAISE:
-                    bob_stats.num_raises[self.betting_round] += 1
                     if not self.high_bet:  # Bet
                         self.high_bet = min(chips_avail, self.bet_amt)
                     else:  # Raise
