@@ -207,9 +207,9 @@ class Strategy:
         i, j = (i, j) if suited else (j, i)
 
         match self.strength_table[i][j]:
-            case 8 | 7:
+            case 8 | 7 | 6:
                 return Action.RAISE_OR_CALL
-            case 6 | 5 | 4:
+            case 5 | 4:
                 return Action.CHECK_OR_CALL
             case 3 | 2 | 1 | 0:
                 return Action.CHECK_OR_FOLD
