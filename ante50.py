@@ -472,6 +472,9 @@ class Game:
             self.decide_winner()
             self.show_round(always=True)  # Showdown
 
+            # TODO-debug
+            print(bob_stats.chips_lost)
+
         #raise RuntimeError('TODO: exited because target_num_hands reached or num_active_players == 1; declare the game winner here')
 
 
@@ -479,9 +482,11 @@ class Game:
         assert isinstance(amount, int)
         assert amount > 0
 
+        print('H  ', end='')  # TODO-debug
+        print(self.high_bet_per_round)
         chips_avail = max(0, self.acting_player.chips - sum(self.high_bet_per_round))
         self.acting_player.current_bet = chips_avail if chips_avail < amount else amount
-        self.acting_player.cumul_bet = sum(self.high_bet_per_round) + self.acting_player.current_bet
+        self.acting_player.cumul_bet = min(self.acting_player.chips, sum(self.high_bet_per_round) + self.acting_player.current_bet)
 
     def put_bets_into_pot(self):
         self.high_bet_per_round.append(self.high_bet)
@@ -503,27 +508,29 @@ class Game:
         self.betting_round = 0
         self.bet_amt, self.bet_cap = LIMIT_BET, 4 * LIMIT_BET
 
+        for player in self.players:
+            player.cumul_bet = 0
+            player.current_bet = 0
+
+        self.high_bet = self.bet_amt  # needed for when big blind does not have enough chips
+        self.high_bet_per_round = []
+
         if self.num_hands > 1:
             self.advance_button()
-
         if self.num_active_players > 2:
             self.acting_player = self.dealer.next
         else:
             self.acting_player = self.dealer
+
         self.update_bet(self.bet_amt // 2)  # Small blind
         self.acting_player = self.acting_player.next
         self.update_bet(self.bet_amt)  # Big blind
         self.acting_player = self.acting_player.next
 
-        self.high_bet = self.bet_amt  # needed for when big blind does not have enough chips
-        self.high_bet_per_round = []
-
         reshuffle()
         for player in self.players:
             # ... and deal
             player.in_hand = True if player.in_game else False
-            player.cumul_bet = 0
-            player.current_bet = 0
             if player.in_hand:
                 player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
                 player.seen_cards = '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
@@ -646,6 +653,7 @@ class Game:
                 self.bet_amt, self.bet_cap = 2 * LIMIT_BET, 8 * LIMIT_BET
                 self.board.append( draw_card() )
             case Round.SHOWDOWN:
+                self.bet_amt, self.bet_cap = 0, 0
                 for player in self.players:
                     if player.in_game:
                         player.seen_cards = ' fold  ' if not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
@@ -664,6 +672,7 @@ class Game:
             pot_order_highest_first.append(0)
         incremental_pot_amount = [hi-lo for (hi, lo) in pairwise(pot_order_highest_first)]
 
+        print(f'cb  -> {self.me.cumul_bet}')  # TODO-debug
         for player in self.players:
             player.chips -= player.cumul_bet
 
@@ -711,6 +720,7 @@ class Game:
             bob_stats.losing_hand_type[my_hand.strength] += 1
         else:  # folded
             bob_stats.num_folds[Round.PREFLOP] += 1
+            bob_stats.chips_lost[Round.PREFLOP] += self.me.cumul_bet
         bob_stats.hole_str_cnt[self.me.hole_str()] += 1
 
         for player in self.players:
