@@ -237,22 +237,34 @@ class Game:
         player_to_remove.in_game = False
         self.active_players -= 1
 
-    def play(self):
+    def play_gui(self):
+        self.play(gui=True)
+
+    def play(self, gui=False):
         while self.active_players > 1:
             self.begin_round()
-            self.show_table_and_get_action()  # Pre-flop
+            if not gui:
+                self.show_table()  # Pre-flop
+            self.get_action()
 
             if self.advance_round():  continue
-            self.show_table_and_get_action()  # Flop
+            if not gui:
+                self.show_table()  # Flop
+            self.get_action()
 
             if self.advance_round():  continue
-            self.show_table_and_get_action()  # Turn
+            if not gui:
+                self.show_table()  # Turn
+            self.get_action()
 
             if self.advance_round():  continue
-            self.show_table_and_get_action()  # River
+            if not gui:
+                self.show_table()  # River
+            self.get_action()
 
             if self.advance_round(): continue
-            self.show_table()  # Showdown
+            if not gui:
+                self.show_table()  # Showdown
             self.get_action()  # TODO-debug
 
             self.decide_winner()
