@@ -1,13 +1,9 @@
-from ante50 import Game, Hand, Player, Strategy, reshuffle, draw_card, card_name, deck
+from ante50 import Action, Round
+from ante50 import Game, Hand, Player, Strategy
+from ante50 import reshuffle, draw_card, card_name
+from ante50 import deck
 
 import pytest
-
-
-### def test_strategy_class():
-###     with pytest.raises(ValueError):
-###         Strategy(v=0)
-###     s = Strategy(v=1)
-###     assert s.position_awareness_frac == 0.8
 
 
 def test_deck_contents():
@@ -338,6 +334,36 @@ def test_preflop_strength_table_and_hole_str():
     hole_str = plyr.hole_str()
     assert hole_str == '87'
     assert preflop_strat.get_preflop_action(hole_str, 10).name == 'CHECK_OR_FOLD'
+
+def test_play_two_rounds():
+    game = Game(players=7, hands=1)
+
+    for i in range(2):
+        game.begin_round()
+        assert game.round_not_finished
+        assert game.num_hands == i+1
+        assert game.board == []
+        assert game.betting_round == Round.PREFLOP
+        assert game.bet_amt > 0
+        assert any([p.cumul_bet for p in game.players])
+        assert any([p.current_bet for p in game.players])
+
+        # TODO: set every player to known hand
+        game.execute(Action.CHECK_OR_CALL)
+
+        game.advance_round()
+        game.execute(Action.CHECK_OR_CALL)
+
+        game.advance_round()
+        game.execute(Action.CHECK_OR_CALL)
+
+        game.advance_round()
+        game.execute(Action.CHECK_OR_CALL)
+
+        game.advance_round()
+        #assert not game.round_not_finished
+        game.decide_winner()
+        # TODO: check outcome
 
 # TODO: create game n=2, fold at each stage and check board and deck are correctly allocated
 def test_headsup_game_variable_allocation(monkeypatch):
