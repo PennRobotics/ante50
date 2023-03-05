@@ -1,4 +1,4 @@
-from ante50 import Game, Hand, Player, Strategy, reshuffle, draw_card, card_name
+from ante50 import Game, Hand, Player, Strategy, reshuffle, draw_card, card_name, deck
 
 import pytest
 
@@ -9,6 +9,22 @@ import pytest
 ###     s = Strategy(v=1)
 ###     assert s.position_awareness_frac == 0.8
 
+
+def test_deck_contents():
+    assert 'AKs' not in deck
+    assert 'AK' not in deck
+    assert '10s' not in deck
+    assert 'JH' not in deck
+    assert 'Jh' in deck
+    assert 'Js' in deck
+    assert 'Ts' in deck
+    assert '2s' in deck
+    assert '4c' in deck
+    assert '4d' in deck
+    assert '4e' not in deck
+    assert 'Qc' in deck
+    assert 'Ac' in deck
+    assert 'Kh' in deck
 
 def test_hand_failures():
     with pytest.raises(AssertionError):
@@ -225,9 +241,9 @@ def test_card_names():
 
 
 def test_game_players_cycle():
-    game = Game(n=5)
+    game = Game(players=5, hands=0)
     assert len(game.players) == 5
-    assert game.active_players == 5
+    assert game.num_active_players == 5
     assert game.players[0].button
     assert game.dealer == game.players[0]
     for player in game.players[1:]:
@@ -240,14 +256,15 @@ def test_game_players_cycle():
     assert current_player == game.players[3]
     current_player = current_player.next
     current_player = current_player.next
-    assert game.active_players == 5
+    assert game.num_active_players == 5
     assert current_player == game.players[0]
     for _ in range(57):  # 11 full cycles + 2 positions
         current_player = current_player.next
     assert current_player == game.players[2]
     current_player = current_player.next
-    game.remove_player(2)
-    assert game.active_players == 4
+    player_being_removed = current_player.prev
+    game.remove_player(player_being_removed)  # player in idx 2
+    assert game.num_active_players == 4
     assert current_player == game.players[3]
     current_player = current_player.next
     current_player = current_player.next
@@ -256,12 +273,12 @@ def test_game_players_cycle():
     current_player = current_player.next
     assert current_player == game.players[3]
     with pytest.raises(AssertionError):
-        game.remove_player(2)
-    assert game.active_players == 4
+        game.remove_player(player_being_removed)  # player in idx 2
+    assert game.num_active_players == 4
     current_player = current_player.next
     assert current_player == game.players[4]
-    game.remove_player(0)
-    assert game.active_players == 3
+    game.remove_player(current_player.next)  # player in idx 0
+    assert game.num_active_players == 3
     current_player = current_player.next
     assert current_player == game.players[1]
     for _ in range(57):  # 3 players left, 57 is divisible by 3
@@ -269,9 +286,9 @@ def test_game_players_cycle():
     assert current_player == game.players[1]
     current_player = current_player.next
     assert current_player == game.players[3]
-    game.remove_player(1)
-    assert game.active_players == 2
-    current_player = current_player.next
+    game.remove_player(current_player.prev)  # player in idx 1
+    assert game.num_active_players == 2
+    current_player = current_player.prev
     assert current_player == game.players[4]
     current_player = current_player.next
     assert current_player == game.players[3]
@@ -292,12 +309,12 @@ def test_preflop_strength_table_and_hole_str():
     plyr.hole_cards = ['Qs', 'Ks',]
     hole_str = plyr.hole_str()
     assert hole_str == 'KQs'  # check highest character is always first (suited)
-    assert preflop_strat.get_preflop_action(hole_str).name == 'RAISE_OR_CALL'
+    assert preflop_strat.get_preflop_action(hole_str, 6).name == 'RAISE_OR_CALL'
 
     plyr.hole_cards = ['As', 'Ah',]
     hole_str = plyr.hole_str()
     assert hole_str == 'AA'
-    assert preflop_strat.get_preflop_action(hole_str).name == 'RAISE_OR_CALL'
+    assert preflop_strat.get_preflop_action(hole_str, 10).name == 'RAISE_OR_CALL'
 
     plyr.hole_cards = ['Ah', 'Js',]
     hole_str = plyr.hole_str()
@@ -305,22 +322,22 @@ def test_preflop_strength_table_and_hole_str():
     plyr.hole_cards = ['Js', 'Ah',]  # check highest character is always first (unsuited)
     hole_str = plyr.hole_str()
     assert hole_str == 'AJ'
-    assert preflop_strat.get_preflop_action(hole_str).name == 'CHECK_OR_CALL'
+    assert preflop_strat.get_preflop_action(hole_str, 10).name == 'CHECK_OR_FOLD'
 
     plyr.hole_cards = ['Js', 'As',]
     hole_str = plyr.hole_str()
     assert hole_str == 'AJs'
-    assert preflop_strat.get_preflop_action(hole_str).name == 'RAISE_OR_CALL'
+    assert preflop_strat.get_preflop_action(hole_str, 4).name == 'RAISE_OR_CALL'
 
     plyr.hole_cards = ['8d', '7d',]
     hole_str = plyr.hole_str()
     assert hole_str == '87s'
-    assert preflop_strat.get_preflop_action(hole_str).name == 'CHECK_OR_CALL'
+    assert preflop_strat.get_preflop_action(hole_str, 6).name == 'CHECK_OR_CALL'
 
     plyr.hole_cards = ['7c', '8d',]
     hole_str = plyr.hole_str()
     assert hole_str == '87'
-    assert preflop_strat.get_preflop_action(hole_str).name == 'CHECK_OR_FOLD'
+    assert preflop_strat.get_preflop_action(hole_str, 10).name == 'CHECK_OR_FOLD'
 
 # TODO: create game n=2, fold at each stage and check board and deck are correctly allocated
 def test_headsup_game_variable_allocation(monkeypatch):
