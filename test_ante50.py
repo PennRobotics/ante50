@@ -352,11 +352,15 @@ def test_play_two_rounds():
         assert all([p.in_game for p in game.players])
         assert all([len(p.hole_cards) == 2 for p in game.players])
         assert sum([1 if p.button else 0 for p in game.players]) == 1
-        game.players[0].hole_cards = [['Ks'], ['As'],]
-        game.players[1].hole_cards = [['Jc'], ['Jd'],]
-        game.players[2].hole_cards = [['2s'], ['4s'],]
-        game.players[3].hole_cards = [['Th'], ['2c'],]
-        game.players[4].hole_cards = [['Kd'], ['Kc'],]
+        game.players[0].hole_cards = ['Ks', 'As',]
+        game.players[1].hole_cards = ['Jc', 'Jd',]
+        game.players[2].hole_cards = ['2s', '4s',]
+        game.players[3].hole_cards = ['Th', '2c',]
+        game.players[4].hole_cards = ['Kd', 'Kc',]
+
+        for player in game.players:
+            player.hole_str()  # has asserts inside function
+
         game.execute(Action.CHECK_OR_CALL)
         game.execute(Action.CHECK_OR_CALL)
         game.execute(Action.CHECK_OR_CALL)

@@ -580,6 +580,7 @@ class Game:
 
     def execute(self, action):
         assert isinstance(action, Action)
+        assert self.acting_player != self.last_player_to_decide.next
 
         chips_avail = max(0, self.acting_player.chips - sum(self.high_bet_per_round))
         allin = False if chips_avail else True
