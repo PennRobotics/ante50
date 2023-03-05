@@ -716,7 +716,7 @@ class Game:
                 if self.me.in_hand:
                     player.stats.hands_lost += 1
                 else:
-                    player.stats.num_folds[-1] += 1  # FIXME
+                    player.stats.num_folds[-1] += 1  # TODO
 
 
 def reshuffle():
