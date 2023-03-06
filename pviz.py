@@ -101,6 +101,7 @@ class Frontend:
                 window.show()
                 window.connect('destroy', Gtk.main_quit)
                 Gtk.main()
+                print('', end='')
             case _:
                 raise ValueError('unexpected case')
 
