@@ -1,5 +1,5 @@
-ante50
-======
+Ante50 Poker Tools
+==================
 > _gui branch_
 
 ## GUI
