@@ -26,6 +26,15 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
+@Gtk.Template.from_file('glade.glade')
+class AppWindow(Gtk.ApplicationWindow):
+    __gtype_name__ = 'Ante50Gui'
+    FoldButton: Gtk.Button = Gtk.Template.Child()
+
+#class Application(Gtk.Application):
+    #def __init__(self, *args, **kwargs):
+
+
 class Frontend:
     def __init__(self, mode, gh):
         match mode:
@@ -88,7 +97,7 @@ class Frontend:
                 print('disp p')
                 raise RuntimeError('TODO: implement')
             case Gui.GTK:
-                window = Gtk.Window(title='test')
+                window = AppWindow()#Gtk.Window(title='test')
                 window.show()
                 window.connect('destroy', Gtk.main_quit)
                 Gtk.main()
