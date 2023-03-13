@@ -48,6 +48,9 @@ For a detailed view of a profiling trace, see [cprofile.md](cprofile.md)
 **montecarlo**
 : removing user input so strategy definitions can be tested against one another
 
+**sql**
+: replacing class-held statistical data with an external SQL database file
+
 ## Contributing
 
 Feel free to create Issues or Pull Requests, or to fork this and make it awesome, or to make your own competing software
