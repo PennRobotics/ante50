@@ -1,10 +1,21 @@
-ante50
-======
-> _main_
+Ante50 Poker Tools
+==================
+> _sql branch_
 
-## Development Plan
+## SQL
 
-I am currently contemplating moving to Meson and splitting the functionality of this program across fairly clear lines. I also want to take part in the CS50P final project (which is where the 50 suffix originates), and much of the ability to move fast comes from writing Python code instead of figuring out build systems, dependencies, GUI frameworks, and so on. Thus, I am creating a series of project milestones as well as multiple branches:
+Since one goal of this project is to store statistical data about each element of a poker session&mdash;the game, table, player, hand, betting, et cetera&mdash;a relational database just makes sense, and CS50 devotes three hours of instruction to the subject, including a hearty introduction to SQL.
+
+There are additional benefits to using SQL:
+
+- data can be retrieved outside of the Python script (including external visualization!)
+- data could be stored persistently (each session adds to the database rather than replaces it)
+- potential space savings
+- faster data access
+- possibly simple syntax compared to creating inter-class relations in Python
+
+
+## Branches
 
 **main**
 : will probably be largely untouched until one of the branches shows great promise
@@ -27,79 +38,10 @@ I am currently contemplating moving to Meson and splitting the functionality of 
 **montecarlo**
 : removing user input so strategy definitions can be tested against one another
 
+**sql**
+: replacing class-held statistical data with an external SQL database file
+
 ## Contributing
 
 Feel free to create Issues or Pull Requests, or to fork this and make it awesome, or to make your own competing software
-
-## Classes
-
-| Stats |
-| ----- |
-| _Keeps a record of actions and reactions_ |
-| `calculate_ev()` (TODO) distill stats to a signed float showing lifetime per-hand expected value |
-
-| Strategy |   |
-| -------- | - |
-| _Determines action based on available information with optional random variation_ |  |
-| `get_preflop_action(hole_str, seat_pos)` (TODO) returns the Action recommended for a pair of hole cards using parameters in Strategy | `hole_str` examples: `"AKs"`, `"JJ"`, `"T4"` |
-
-
-| Player |
-| ------ |
-| _Contains member variables for a player: name, chips, involvement in game, position, personal stats and strategy, etc. |
-
-
-| OtherHolePredictor |
-| ------------------ |
-| _List guess of opponent hole cards using available information_ (TODO) |
-
-
-| DrawFinder |  |
-| ---------- | - |
-| _Figure out specific draws available based on visible cards_ |  |
-| `get_draws(hole_set, board_set)` (TODO) | set example: `set(['Kh', '4d'])` |
-
-
-| Hand |
-| ---- |
-| _Provides value of a hand_  
-  `(hand_set, owner=None)` |
-| `owner` determines who the hand belongs, for use during showdown |
-| `get_value(hand_set, owner=None)` |  <!-- TODO -->
-| `__str__()` |  <!-- TODO -->
-| `__repr__()` |  <!-- TODO -->
-| `compare(other)` -- returns -1, 0, or 1 to indicate loss, tie, or win |
-| `number_of_outs()` (TODO) |
-
-
-| Game |
-| ---- |
-| _Creates a group of players and table/game statistics_ |
-| `remove_player(idx)` (TODO) |
-| `play()` -- begin the main state machine to get player input and display table and players |
-| `begin_round()` -- advance button, shuffle deck and reset interator, reset per-hand variables |
-| `show_table_and_get_action()` -- a wrapper to call `show_table()` and `get_action()` |
-| `show_table()` -- stdio display of table, uses a cursor movement escape sequence to update display |
-| `get_action()` -- gets player input and decides action of non-controlled opponents |
-| `advance_round()` -- draws cards and sets bet amount for the current round |
-| `decide_winner()` -- compares each player in an array, eliminating losing hands |
-
-
-### Top-level Functions
-
-`reshuffle()` -- resets `known` and `unknown` card sets, applies `random.shuffle` to `deck`, creates an iterator for providing the next card
-
-`draw_card()` -- takes a card from the playing deck iterator (`from_deck`) and updates `known` and `unknown` cards if visible
-
-`card_name()` -- provides a plaintext description of a single card
-
-## Improvement
-
-### Unit testing
-
-To run the [pytest](https://github.com/pytest-dev/pytest/) test suite: `pip install pytest` followed by `pytest test_ante50.py`
-
-### Code coverage
-
-Coverage can be easily recorded via `pip install coverage`, then `coverage run ante50.py` and eventually `coverage html` or `coverage report`
 
