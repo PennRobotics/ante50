@@ -32,12 +32,17 @@ from collections import Counter
 from enum import IntEnum, auto
 from itertools import pairwise
 from random import shuffle
+import signal
+import sqlite3
+import sys
 
 
 # Consts
 MAX_VER = 1
 LIMIT_BET = 2
 CURSOR_UP = '\033[1A' if True else ''
+YELLOW = '\033[93m'
+NORMAL = '\033[0m'
 SUITS = 'cdhs'
 VALUES = '23456789TJQKA'
 WHEEL = 'A2345'
@@ -109,12 +114,33 @@ HAND_NAME = {HandRank.HIGH_CARD: '{} high',
 deck = [value + suit for value in VALUES for suit in SUITS]
 known = set()
 unknown = set(deck)
+db_open = False
+db = None
 
+
+def sig_handler(sig, f):
+    global db_open
+    global db
+
+    if db_open:
+        db.close()
+        db_open = False
+        print(f'\n{YELLOW}Stats database closed{NORMAL}')
+
+    raise KeyboardInterrupt
+
+signal.signal(signal.SIGINT, sig_handler)
 
 class Stats:
     def __init__(self, v=1):
-        if v < 1 or v > MAX_VER:
-            raise ValueError(f'Invalid version argument provided to Strategy class: {v}')
+        global db_open
+        global db
+
+        assert v == 'sql'
+
+        if not db_open:
+            db = sqlite3.connect(r'pokerstats.db')
+            db_open = True
 
         # Indexes:
         # 0 = during pre-flop betting
@@ -203,7 +229,7 @@ class Player:
         self.table_pos = None
         self.current_bet = None
         self.side_pot_idx = None
-        self.stats = Stats(v=v)
+        self.stats = Stats(v='sql')
         self.strategy = Strategy(v=v)
         if v == 1: return
 
