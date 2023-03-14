@@ -116,6 +116,7 @@ known = set()
 unknown = set(deck)
 db_open = False
 db = None
+db_cur = None
 
 
 def sig_handler(sig, f):
@@ -123,6 +124,7 @@ def sig_handler(sig, f):
     global db
 
     if db_open:
+        db.commit()
         db.close()
         db_open = False
         print(f'\n{YELLOW}Stats database closed{NORMAL}')
@@ -135,30 +137,111 @@ class Stats:
     def __init__(self, v=1):
         global db_open
         global db
+        global db_cur
 
         assert v == 'sql'
 
         if not db_open:
             db = sqlite3.connect(r'pokerstats.db')
+            db_cur = db.cursor()
             db_open = True
 
-        # Indexes:
-        # 0 = during pre-flop betting
-        # 1 = during flop betting
-        # 2 = during turn betting
-        # 3 = during river betting
-        # 4 = after showdown
-        hands_won  = [0, 0, 0, 0, 0]
-        hands_lost = [0, 0, 0, 0, 0]
-        chips_won  = [0, 0, 0, 0, 0]
-        chips_lost = [0, 0, 0, 0, 0]
-        num_folds  = [0, 0, 0, 0, 0]
-        num_calls  = [0, 0, 0, 0, 0]
-        num_raises = [0, 0, 0, 0, 0]
-        all_in_hands_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-        all_in_chips_won_lost = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
-        hole_str_cnt = Counter()  # TODO: initialize all to zero
-        if v == 1:  return
+        # TODO: only execute if table does not currently exist
+        try:
+            db_cur.execute('SELECT * FROM Games LIMIT 1')
+        except:
+            db_cur.execute('''
+                CREATE TABLE Games (
+                    game_id INTEGER PRIMARY KEY
+                )''')
+
+        try:
+            db_cur.execute('SELECT * FROM Players LIMIT 1')
+        except:
+            db_cur.execute('''
+                CREATE TABLE Players (
+                    player_id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL
+                )''')
+
+        try:
+            db_cur.execute('SELECT * FROM DealtCards LIMIT 1')
+        except:
+            db_cur.execute('''
+                CREATE TABLE DealtCards (
+                    dealt_cards_id INTEGER PRIMARY KEY,
+                    dealer_cards TEXT,
+                    dealer_plus_1_cards TEXT,
+                    dealer_plus_2_cards TEXT,
+                    dealer_plus_3_cards TEXT,
+                    dealer_plus_4_cards TEXT,
+                    dealer_plus_5_cards TEXT,
+                    dealer_plus_6_cards TEXT,
+                    dealer_plus_7_cards TEXT,
+                    dealer_plus_8_cards TEXT,
+                    dealer_plus_9_cards TEXT,
+                    flop_cards TEXT,
+                    turn_cards TEXT,
+                    river_cards TEXT
+                )''')
+
+        try:
+            db_cur.execute('SELECT * FROM Hands LIMIT 1')
+        except:
+            db_cur.execute('''
+                CREATE TABLE Hands (
+                    hand_id INTEGER PRIMARY KEY,
+                    game_id INTEGER NOT NULL,
+                    dealt_cards_id INTEGER NOT NULL,
+                    dealer_seat INTEGER NOT NULL,
+                    seat1_player_id INTEGER,
+                    seat2_player_id INTEGER,
+                    seat3_player_id INTEGER,
+                    seat4_player_id INTEGER,
+                    seat5_player_id INTEGER,
+                    seat6_player_id INTEGER,
+                    seat7_player_id INTEGER,
+                    seat8_player_id INTEGER,
+                    seat9_player_id INTEGER,
+                    seat10_player_id INTEGER
+                )''')
+
+        # Actions should also contain side/main pot award/partial award, loss at showdown, and all-in
+        #   round_id = 0 (preflop), 1 (flop), 2 (turn), 3 (river), 4 (showdown)
+        #   action_name = "fold", "bet"*, "raise"*, "call", "check", "all-in"*, "lose", "win"*
+        #   action_name with * should have `amount`, others should not
+        try:
+            db_cur.execute('SELECT * FROM Actions LIMIT 1')
+        except:
+            db_cur.execute('''
+                CREATE TABLE Actions (
+                    action_id INTEGER PRIMARY KEY,
+                    hand_id INTEGER NOT NULL,
+                    round_id INTEGER NOT NULL,
+                    seat_id INTEGER NOT NULL,
+                    action_name TEXT NOT NULL,
+                    amount INTEGER
+                )''')
+
+        try:
+            db_cur.execute('SELECT * FROM CalledHands LIMIT 1')
+        except:
+            db_cur.execute('''
+                CREATE TABLE CalledHands (
+                    called_hand_id INTEGER PRIMARY KEY,
+                    hand_id INTEGER NOT NULL,
+                    seat_id INTEGER NOT NULL,
+                    hand_name TEXT NOT NULL,
+                    hand_rank INTEGER NOT NULL,
+                    hand_subrank INTEGER NOT NULL,
+                    hand_kicker2 TEXT,
+                    hand_kicker3 TEXT
+                )''')
+
+
+        if v == 'sql':
+            print(f'{YELLOW}SQL statistics in-use!{NORMAL}')
+            return
 
         # TODO: future version variables belong here
         pass
@@ -218,6 +301,7 @@ class Player:
     def __init__(self, v=1, npc=True):
         assert isinstance(npc, bool)
         self.npc = npc
+        self.stats = Stats(v='sql')
         if not npc:  return
 
         self.name = '       '
@@ -229,7 +313,6 @@ class Player:
         self.table_pos = None
         self.current_bet = None
         self.side_pot_idx = None
-        self.stats = Stats(v='sql')
         self.strategy = Strategy(v=v)
         if v == 1: return
 
