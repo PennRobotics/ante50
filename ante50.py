@@ -444,7 +444,9 @@ class Game:
         assert player_to_remove.in_game
 
         playing_behind = player_to_remove.prev
+        assert playing_behind is not None
         playing_ahead = player_to_remove.next
+        assert playing_ahead is not None
 
         playing_behind.next = playing_ahead
         playing_ahead.prev = playing_behind
@@ -580,7 +582,6 @@ class Game:
 
     def execute(self, action):
         assert isinstance(action, Action)
-        assert self.acting_player != self.last_player_to_decide.next
 
         chips_avail = max(0, self.acting_player.chips - sum(self.high_bet_per_round))
         allin = False if chips_avail else True
