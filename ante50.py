@@ -23,7 +23,18 @@ from random import shuffle
 MAX_VER = 1
 LIMIT_BET = 2
 CURSOR_UP = '\033[1A' if True else ''
+RED = '\033[97m\033[41m'
+GREEN = '\033[97m\033[42m'
+BLUE = '\033[97m\033[44m'
+GREY = '\033[97m\033[100m'
+NORMAL = '\033[0m'
 SUITS = 'cdhs'
+SUIT_CODE = [GREEN, BLUE, RED, GREY]
+EDGE = u'\u2502'
+TOP_ROW = u'\u256d\u2500\u2500\u252c\u2500\u2500\u256e'
+BOT_ROW = u'\u2570\u2500\u2500\u2534\u2500\u2500\u256f'
+TOP_EDGE = u'\u256d\u2500\u2500\u256e'
+BOT_EDGE = u'\u2570\u2500\u2500\u256f'
 VALUES = '23456789TJQKA'
 WHEEL = 'A2345'
 
@@ -94,6 +105,8 @@ HAND_NAME = {HandRank.HIGH_CARD: '{} high',
 deck = [value + suit for value in VALUES for suit in SUITS]
 known = set()
 unknown = set(deck)
+
+cc = lambda cardstr: SUIT_CODE[SUITS.index(cardstr[1])] + cardstr + NORMAL
 
 
 
@@ -283,16 +296,22 @@ class Game:
         for player in self.players:
             player.in_hand = True if player.in_game else False
             player.hole_cards = [ draw_card(npc=player.npc), draw_card(npc=player.npc), ]
-            player.seen_cards = '       ' if not player.in_hand else '|XX|XX|' if player.npc else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+            player.seen_cards = '       ' if not player.in_hand else \
+                               f'{EDGE}XX{EDGE}XX{EDGE}' if player.npc else \
+                               f'{EDGE}{cc(player.hole_cards[0])}{EDGE}{cc(player.hole_cards[1])}{EDGE}'
 
     def show_table_and_get_action(self):
         self.show_table()
         self.get_action()
 
     def show_table(self):
-        print('                                        === ' + ROUND_NAME[self.betting_round] + ' ===      ')
-        print('                          Board: ', end='')
-        print(self.board)
+        print('                                        === ' + ROUND_NAME[self.betting_round] + ' ===      ')  # TODO: proper center
+        print('                             ', end='')
+        print('   '.join([TOP_EDGE for card in self.board]))
+        print('                    Board:   ', end='')
+        print('   '.join([EDGE + cc(card) + EDGE for card in self.board]))
+        print('                             ', end='')
+        print('   '.join([BOT_EDGE for card in self.board]))
         print()
         if self.betting_round == 4:
             print('Winner:')
@@ -302,9 +321,10 @@ class Game:
         print('         ' + '   '.join(['  (D)  ' if player.button else '       ' for player in self.players]) )
         print('         ' + '   '.join([player.name for player in self.players]) )
         print('         ' + '   '.join([f'{player.chips:^7}' for player in self.players]) )
-        print()
+
+        print('         ' + '   '.join([TOP_ROW if player.in_hand else '       ' for player in self.players]) )
         print('         ' + '   '.join([player.seen_cards for player in self.players]) )
-        print()
+        print('         ' + '   '.join([BOT_ROW if player.in_hand else '       ' for player in self.players]) )
 
     def get_action(self):
         if self.betting_round == 4:  # TODO-debug
@@ -332,6 +352,9 @@ class Game:
         for player in self.players:
             player.current_bet = 0
 
+        # TODO
+        # print(CURSOR_UP * 16)
+
     def advance_round(self):
         num_players = sum([1 if player.in_hand else 0 for player in self.players])
         self.betting_round += 1
@@ -350,7 +373,7 @@ class Game:
                 self.board.append( draw_card() )
             case 4:
                 for player in self.players:
-                    player.seen_cards = '       ' if not player.in_hand else f'|{player.hole_cards[0]}|{player.hole_cards[1]}|'
+                    player.seen_cards = '       ' if not player.in_hand else f'{EDGE}{cc(player.hole_cards[0])}{EDGE}{cc(player.hole_cards[1])}{EDGE}'
 
     def decide_winner(self):
         # TODO: for each player in the outermost pot, test against neighbor until only players with "0" compare remain.
