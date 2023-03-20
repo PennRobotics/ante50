@@ -167,8 +167,11 @@ class Stats:
 
         if not db_open:
             db = sqlite3.connect(r'pokerstats.db')
+            db.execute('PRAGMA foreign_keys = 1')
             db_cur = db.cursor()
             db_open = True
+
+        # TODO: FOREIGN abc (xyz) REFERENCES def (xyz-ish)
 
         try:
             db_cur.execute('SELECT game_id, tournament_id, name FROM Games LIMIT 1')
