@@ -38,6 +38,7 @@ import sys
 
 
 # Consts
+DESTROY_TABLE_ON_SQL_ERROR = True
 MAX_VER = 1
 LIMIT_BET = 2
 CURSOR_UP = '\033[1A' if True else ''
@@ -133,6 +134,29 @@ def sig_handler(sig, f):
 
 signal.signal(signal.SIGINT, sig_handler)
 
+#                                              CalledHands
+#                                              -----------
+#                                              called_hand_id
+#                                          ... hand_id
+#                                          :   seat_num
+#      Players                             :   hand_name         DealtCards
+#      -------                             :   hand_rank         ----------
+#  ... player_id                 Hands     :   hand_subrank      dealt_cards_id
+#  :   name                      -----     :    ................ hand
+#  :                      ...::: hand_id :::....:                card_string
+#  :   SeatingChart       :  :   game_id .........               position (1..10)
+#  :   ------------       :  :   dealer_seat_abs :   Games       position_is_board
+#  :   seating_chart_id   :  :                   :   -----       run_index
+#  :.. player             :  :                   :.. game_id
+#      hand ..............:  :   Actions             tournament_id ..  Tournaments
+#      abs_seat              :   -------             table_num      :  -----------
+#      rel_seat              :   action_id           name           :. tournament_id
+#      start_stack           :.. hand_id                               start_time
+#                                round_num                             prize_pool_id (TODO)
+#                                seat_num                              bet_structure_id (TODO)
+#                                action_name
+#                                amount
+
 class Stats:
     def __init__(self, v=1):
         global db_open
@@ -146,18 +170,37 @@ class Stats:
             db_cur = db.cursor()
             db_open = True
 
-        # TODO: only execute if table does not currently exist
         try:
-            db_cur.execute('SELECT * FROM Games LIMIT 1')
+            db_cur.execute('SELECT game_id, tournament_id, name FROM Games LIMIT 1')
         except:
+            if (DESTROY_TABLE_ON_SQL_ERROR):
+                db_cur.execute('''DROP TABLE IF EXISTS Games''')
             db_cur.execute('''
                 CREATE TABLE Games (
-                    game_id INTEGER PRIMARY KEY
+                    game_id INTEGER PRIMARY KEY,
+                    tournament_id INTEGER,
+                    table_num INTEGER,
+                    name TEXT
                 )''')
 
         try:
-            db_cur.execute('SELECT * FROM Players LIMIT 1')
+            db_cur.execute('SELECT tourney_id, start_time, prize_pool_id, bet_structure_id FROM Tournaments LIMIT 1')
         except:
+            if (DESTROY_TABLE_ON_SQL_ERROR):
+                db_cur.execute('''DROP TABLE IF EXISTS Tournaments''')
+            db_cur.execute('''
+                CREATE TABLE Tournaments (
+                    tourney_id INTEGER PRIMARY KEY,
+                    start_time TIMESTAMP,
+                    prize_pool_id INTEGER,
+                    bet_structure_id INTEGER
+                )''')
+
+        try:
+            db_cur.execute('SELECT player_id, name FROM Players LIMIT 1')
+        except:
+            if (DESTROY_TABLE_ON_SQL_ERROR):
+                db_cur.execute('''DROP TABLE IF EXISTS Players''')
             db_cur.execute('''
                 CREATE TABLE Players (
                     player_id INTEGER PRIMARY KEY,
@@ -165,45 +208,45 @@ class Stats:
                 )''')
 
         try:
-            db_cur.execute('SELECT * FROM DealtCards LIMIT 1')
+            db_cur.execute('SELECT hand_id, game_id, dealer_seat_abs FROM Hands LIMIT 1')
         except:
-            db_cur.execute('''
-                CREATE TABLE DealtCards (
-                    dealt_cards_id INTEGER PRIMARY KEY,
-                    dealer_cards TEXT,
-                    dealer_plus_1_cards TEXT,
-                    dealer_plus_2_cards TEXT,
-                    dealer_plus_3_cards TEXT,
-                    dealer_plus_4_cards TEXT,
-                    dealer_plus_5_cards TEXT,
-                    dealer_plus_6_cards TEXT,
-                    dealer_plus_7_cards TEXT,
-                    dealer_plus_8_cards TEXT,
-                    dealer_plus_9_cards TEXT,
-                    flop_cards TEXT,
-                    turn_cards TEXT,
-                    river_cards TEXT
-                )''')
-
-        try:
-            db_cur.execute('SELECT * FROM Hands LIMIT 1')
-        except:
+            if (DESTROY_TABLE_ON_SQL_ERROR):
+                db_cur.execute('''DROP TABLE IF EXISTS Hands''')
             db_cur.execute('''
                 CREATE TABLE Hands (
                     hand_id INTEGER PRIMARY KEY,
                     game_id INTEGER NOT NULL,
-                    dealt_cards_id INTEGER NOT NULL,
-                    dealer_seat INTEGER NOT NULL,
-                    seat1_player_id INTEGER,
-                    seat2_player_id INTEGER,
-                    seat3_player_id INTEGER,
-                    seat4_player_id INTEGER,
-                    seat5_player_id INTEGER,
-                    seat6_player_id INTEGER,
-                    seat7_player_id INTEGER,
-                    seat8_player_id INTEGER,
-                    seat9_player_id INTEGER,
-                    seat10_player_id INTEGER
+                    dealer_seat_abs INTEGER NOT NULL
+                )''')
+
+        try:
+            db_cur.execute('SELECT seating_chart_id, player, hand, abs_seat, rel_seat_after_dealer, start_stack FROM SeatingChart LIMIT 1')
+        except:
+            if (DESTROY_TABLE_ON_SQL_ERROR):
+                db_cur.execute('''DROP TABLE IF EXISTS SeatingChart''')
+            db_cur.execute('''
+                CREATE TABLE SeatingChart (
+                    seating_chart_id INTEGER PRIMARY KEY,
+                    player INTEGER NOT NULL,
+                    hand INTEGER NOT NULL,
+                    abs_seat INTEGER NOT NULL,
+                    rel_seat_after_dealer INTEGER NOT NULL,
+                    start_stack INTEGER NOT NULL
+                )''')
+
+        try:
+            db_cur.execute('SELECT dealt_cards_id, hand, card_string, position, position_is_board, run_count FROM DealtCards LIMIT 1')
+        except:
+            if (DESTROY_TABLE_ON_SQL_ERROR):
+                db_cur.execute('''DROP TABLE IF EXISTS DealtCards''')
+            db_cur.execute('''
+                CREATE TABLE DealtCards (
+                    dealt_cards_id INTEGER PRIMARY KEY,
+                    hand INTEGER NOT NULL,
+                    card_string TEXT,
+                    position INTEGER NOT NULL,
+                    position_is_board BIT NOT NULL,
+                    run_count INTEGER
                 )''')
 
         # Actions should also contain side/main pot award/partial award, loss at showdown, and all-in
@@ -211,31 +254,33 @@ class Stats:
         #   action_name = "fold", "bet"*, "raise"*, "call", "check", "all-in"*, "lose", "win"*
         #   action_name with * should have `amount`, others should not
         try:
-            db_cur.execute('SELECT * FROM Actions LIMIT 1')
+            db_cur.execute('SELECT action_id, hand_id, round_num, seat_num, action_name, amount FROM Actions LIMIT 1')
         except:
+            if (DESTROY_TABLE_ON_SQL_ERROR):
+                db_cur.execute('''DROP TABLE IF EXISTS Actions''')
             db_cur.execute('''
                 CREATE TABLE Actions (
                     action_id INTEGER PRIMARY KEY,
                     hand_id INTEGER NOT NULL,
-                    round_id INTEGER NOT NULL,
-                    seat_id INTEGER NOT NULL,
+                    round_num INTEGER NOT NULL,
+                    seat_num INTEGER NOT NULL,
                     action_name TEXT NOT NULL,
                     amount INTEGER
                 )''')
 
         try:
-            db_cur.execute('SELECT * FROM CalledHands LIMIT 1')
+            db_cur.execute('SELECT called_hand_id, hand_id, seat_num, hand_name, hand_rank, hand_subrank FROM CalledHands LIMIT 1')
         except:
+            if (DESTROY_TABLE_ON_SQL_ERROR):
+                db_cur.execute('''DROP TABLE IF EXISTS CalledHands''')
             db_cur.execute('''
                 CREATE TABLE CalledHands (
                     called_hand_id INTEGER PRIMARY KEY,
                     hand_id INTEGER NOT NULL,
-                    seat_id INTEGER NOT NULL,
+                    seat_num INTEGER NOT NULL,
                     hand_name TEXT NOT NULL,
                     hand_rank INTEGER NOT NULL,
-                    hand_subrank INTEGER NOT NULL,
-                    hand_kicker2 TEXT,
-                    hand_kicker3 TEXT
+                    hand_subrank INTEGER NOT NULL
                 )''')
 
 
